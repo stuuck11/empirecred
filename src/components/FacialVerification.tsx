@@ -44,45 +44,62 @@ export default function FacialVerification({ profile, setProfile }: { profile: U
     return () => clearInterval(interval);
   }, [recording, timeLeft]);
 
-  const startVerification = async () => {
+  const startVerification = () => {
     setError('');
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.onloadedmetadata = () => {
-          videoRef.current?.play().catch(console.error);
-        };
-      }
-      
-      const mimeType = MediaRecorder.isTypeSupported('video/mp4') 
-        ? 'video/mp4' 
-        : (MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' : '');
-        
-      const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-      mediaRecorderRef.current = mediaRecorder;
-      chunksRef.current = [];
+    setStep(2);
+  };
 
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          chunksRef.current.push(e.data);
+  useEffect(() => {
+    if (step === 2 && !recording) {
+      const initCamera = async () => {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { 
+              facingMode: 'user',
+              width: { ideal: 720 },
+              height: { ideal: 720 }
+            }, 
+            audio: false 
+          });
+          
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+            videoRef.current.onloadedmetadata = () => {
+              videoRef.current?.play().catch(console.error);
+            };
+          }
+          
+          const mimeType = MediaRecorder.isTypeSupported('video/mp4') 
+            ? 'video/mp4' 
+            : (MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' : '');
+            
+          const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+          mediaRecorderRef.current = mediaRecorder;
+          chunksRef.current = [];
+
+          mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) {
+              chunksRef.current.push(e.data);
+            }
+          };
+
+          mediaRecorder.onstop = async () => {
+            const finalType = mimeType || 'video/mp4';
+            const blob = new Blob(chunksRef.current, { type: finalType });
+            await uploadVideo(blob);
+          };
+
+          mediaRecorder.start(1000);
+          setRecording(true);
+        } catch (e) {
+          console.error("Camera error", e);
+          setError("Erro ao acessar câmera. Verifique as permissões.");
+          setStep(1);
         }
       };
-
-      mediaRecorder.onstop = async () => {
-        const finalType = mimeType || 'video/mp4';
-        const blob = new Blob(chunksRef.current, { type: finalType });
-        await uploadVideo(blob);
-      };
-
-      mediaRecorder.start(1000); // Collect data every second
-      setRecording(true);
-      setStep(2);
-    } catch (e) {
-      console.error("Camera error", e);
-      setError("Erro ao acessar câmera. Verifique as permissões.");
+      initCamera();
     }
-  };
+  }, [step]);
 
   const uploadVideo = async (blob: Blob) => {
     setLoading(true);
