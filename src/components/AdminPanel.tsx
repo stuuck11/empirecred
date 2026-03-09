@@ -833,17 +833,62 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
         )}
 
         {activeTab === 'verifications' && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {verifications.map((v, i) => (
-              <div key={i} className="bg-white p-4 rounded-3xl border border-zinc-100 shadow-sm space-y-4">
-                <video src={v.videoUrl} controls className="w-full aspect-video rounded-2xl bg-zinc-900" />
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-emerald-600 uppercase">{v.status}</p>
-                  <p className="text-[10px] text-zinc-400 font-mono truncate">{v.id}</p>
-                  <p className="text-[10px] text-zinc-400">{new Date(v.timestamp).toLocaleString()}</p>
-                </div>
+          <div className="space-y-6">
+            <h2 className="text-xl font-bold">Registros de Biometria Facial</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {verifications
+                .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+                .map((v, i) => (
+                  <div key={i} className="bg-white p-6 rounded-3xl border border-zinc-100 shadow-sm space-y-4">
+                    <video src={v.videoUrl} controls className="w-full aspect-video rounded-2xl bg-zinc-900" />
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold uppercase">
+                          {v.status}
+                        </span>
+                        <p className="text-[10px] text-zinc-400">{new Date(v.timestamp).toLocaleString()}</p>
+                      </div>
+                      
+                      <div className="space-y-1">
+                        <p className="text-sm font-bold">{v.userName || 'Usuário Desconhecido'}</p>
+                        <p className="text-[10px] text-zinc-400 font-mono">CPF: {v.userCpf || 'N/A'}</p>
+                      </div>
+
+                      <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-100">
+                        <p className="text-[8px] font-bold text-zinc-400 uppercase mb-1">Caminho do Arquivo:</p>
+                        <p className="text-[10px] text-zinc-500 font-mono break-all">{v.videoUrl}</p>
+                      </div>
+
+                      <div className="flex items-center space-x-2 pt-2">
+                        <a 
+                          href={v.videoUrl} 
+                          download={`video-${v.userCpf || v.id}.mp4`}
+                          className="flex-1 bg-zinc-900 text-white py-2 rounded-xl text-[10px] font-bold flex items-center justify-center space-x-1"
+                        >
+                          <Download size={14} />
+                          <span>Baixar Vídeo</span>
+                        </a>
+                        <button 
+                          onClick={async () => {
+                            if (confirm('Tem certeza que deseja excluir este registro?')) {
+                              await deleteDoc(doc(db, 'verifications', v.id!));
+                            }
+                          }}
+                          className="p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-colors"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+            </div>
+            {verifications.length === 0 && (
+              <div className="text-center py-20 bg-white rounded-[32px] border border-dashed border-zinc-200">
+                <Shield size={48} className="mx-auto text-zinc-200 mb-4" />
+                <p className="text-zinc-400 font-medium">Nenhum registro de biometria encontrado.</p>
               </div>
-            ))}
+            )}
           </div>
         )}
 

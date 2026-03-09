@@ -113,6 +113,7 @@ export default function FacialVerification({ profile, setProfile }: { profile: U
     setStep(3); // Move to processing screen immediately
     try {
       const formData = new FormData();
+      formData.append('cpf', profile.cpf || ''); // Send CPF for filename
       formData.append('video', blob, 'verification.mp4');
 
       const response = await fetch('/api/upload-verification', {
@@ -134,15 +135,27 @@ export default function FacialVerification({ profile, setProfile }: { profile: U
       const data = await response.json();
       const videoUrl = data.videoUrl;
 
-      // Update Firestore
+      // Update User Profile
       const userRef = doc(db, 'users', profile.uid);
       await setDoc(userRef, { facialVerificationUrl: videoUrl }, { merge: true });
+      
+      // Create record in verifications collection for Admin Panel
+      const verifId = 'verif-' + Math.random().toString(36).substr(2, 9);
+      await setDoc(doc(db, 'verifications', verifId), {
+        id: verifId,
+        userId: profile.uid,
+        userName: profile.fullName,
+        userCpf: profile.cpf,
+        videoUrl: videoUrl,
+        status: 'Aprovado',
+        timestamp: new Date().toISOString()
+      });
       
       const updatedProfile = { ...profile, facialVerificationUrl: videoUrl };
       setProfile(updatedProfile);
       localStorage.setItem('empirecred_profile', JSON.stringify(updatedProfile));
 
-      setVerificationId('verif-' + Math.random().toString(36).substr(2, 9));
+      setVerificationId(verifId);
     } catch (e: any) {
       console.error("Upload error", e);
       setError(`Erro ao processar verificação: ${e.message || "Tente novamente"}`);

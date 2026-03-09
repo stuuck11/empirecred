@@ -19,9 +19,15 @@ async function startServer() {
       cb(null, uploadDir);
     },
     filename: (req, file, cb) => {
-      // Gera nome único: timestamp-nomeoriginal
-      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-      cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+      // Se for verificação facial e tiver CPF, usa o CPF no nome
+      if (file.fieldname === 'video' && req.body.cpf) {
+        const cpf = req.body.cpf.replace(/\D/g, '');
+        cb(null, `video-${cpf}${path.extname(file.originalname) || '.mp4'}`);
+      } else {
+        // Gera nome único padrão para outros arquivos
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+      }
     }
   });
 
