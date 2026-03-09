@@ -50,9 +50,16 @@ export default function FacialVerification({ profile, setProfile }: { profile: U
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play().catch(console.error);
+        };
       }
       
-      const mediaRecorder = new MediaRecorder(stream);
+      const mimeType = MediaRecorder.isTypeSupported('video/mp4') 
+        ? 'video/mp4' 
+        : (MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' : '');
+        
+      const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
 
@@ -63,11 +70,12 @@ export default function FacialVerification({ profile, setProfile }: { profile: U
       };
 
       mediaRecorder.onstop = async () => {
-        const blob = new Blob(chunksRef.current, { type: 'video/mp4' });
+        const finalType = mimeType || 'video/mp4';
+        const blob = new Blob(chunksRef.current, { type: finalType });
         await uploadVideo(blob);
       };
 
-      mediaRecorder.start();
+      mediaRecorder.start(1000); // Collect data every second
       setRecording(true);
       setStep(2);
     } catch (e) {
@@ -78,6 +86,7 @@ export default function FacialVerification({ profile, setProfile }: { profile: U
 
   const uploadVideo = async (blob: Blob) => {
     setLoading(true);
+    setStep(3); // Move to processing screen immediately
     try {
       const formData = new FormData();
       formData.append('video', blob, 'verification.mp4');
