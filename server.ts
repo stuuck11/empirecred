@@ -27,7 +27,7 @@ async function startServer() {
 
   const upload = multer({ 
     storage: storage,
-    limits: { fileSize: 5 * 1024 * 1024 } // Limite de 5MB
+    limits: { fileSize: 50 * 1024 * 1024 } // Limite de 50MB para vídeos longos
   });
 
   app.use(express.json());

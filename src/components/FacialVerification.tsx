@@ -103,6 +103,12 @@ export default function FacialVerification({ profile, setProfile }: { profile: U
   }, [step]);
 
   const uploadVideo = async (blob: Blob) => {
+    if (blob.size === 0) {
+      setError("O vídeo capturado está vazio. Tente novamente.");
+      setStep(1);
+      return;
+    }
+    
     setLoading(true);
     setStep(3); // Move to processing screen immediately
     try {
@@ -114,13 +120,15 @@ export default function FacialVerification({ profile, setProfile }: { profile: U
         body: formData,
       });
 
-      if (!response.ok) throw new Error('Falha no upload do vídeo');
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Falha no upload: ${response.status} ${errorText}`);
+      }
 
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         const text = await response.text();
-        console.error('Non-JSON response received:', text.substring(0, 100));
-        throw new Error('O servidor retornou uma resposta inválida (não JSON). Verifique se o servidor está rodando corretamente.');
+        throw new Error('Resposta do servidor inválida (não JSON)');
       }
 
       const data = await response.json();
@@ -135,10 +143,9 @@ export default function FacialVerification({ profile, setProfile }: { profile: U
       localStorage.setItem('empirecred_profile', JSON.stringify(updatedProfile));
 
       setVerificationId('verif-' + Math.random().toString(36).substr(2, 9));
-      setStep(3);
-    } catch (e) {
+    } catch (e: any) {
       console.error("Upload error", e);
-      setError("Erro ao processar verificação. Tente novamente.");
+      setError(`Erro ao processar verificação: ${e.message || "Tente novamente"}`);
       setStep(1);
     } finally {
       setLoading(false);
