@@ -122,6 +122,15 @@ async function startServer() {
       appType: 'spa',
     });
     app.use(vite.middlewares);
+  } else {
+    // Em produção, serve os arquivos estáticos da pasta dist
+    const distPath = path.join(process.cwd(), 'dist');
+    app.use(express.static(distPath));
+    
+    // Fallback para SPA: envia o index.html para qualquer rota não encontrada
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
   }
 
   app.listen(PORT, '0.0.0.0', () => {
