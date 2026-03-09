@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Shield, CheckCircle2, X, Camera } from 'lucide-react';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { UserProfile } from '../types';
 
@@ -57,7 +57,8 @@ export default function FacialVerification({ profile, setProfile }: { profile: U
             video: { 
               facingMode: 'user',
               width: { ideal: 720 },
-              height: { ideal: 720 }
+              height: { ideal: 720 },
+              aspectRatio: { ideal: 1 }
             }, 
             audio: false 
           });
@@ -127,7 +128,7 @@ export default function FacialVerification({ profile, setProfile }: { profile: U
 
       // Update Firestore
       const userRef = doc(db, 'users', profile.uid);
-      await updateDoc(userRef, { facialVerificationUrl: videoUrl });
+      await setDoc(userRef, { facialVerificationUrl: videoUrl }, { merge: true });
       
       const updatedProfile = { ...profile, facialVerificationUrl: videoUrl };
       setProfile(updatedProfile);
@@ -233,7 +234,7 @@ export default function FacialVerification({ profile, setProfile }: { profile: U
                 autoPlay 
                 muted 
                 playsInline 
-                className="w-full h-full object-cover rounded-full bg-zinc-800"
+                className="w-full h-full object-cover rounded-full bg-zinc-800 -scale-x-100"
               />
             </div>
 
