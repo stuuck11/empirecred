@@ -1,0 +1,52 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Stores user account information and profile data.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "fullName": { "type": "string" },
+        "cpf": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "documents": {
+          "type": "object",
+          "properties": {
+            "frontUrl": { "type": "string" },
+            "backUrl": { "type": "string" }
+          }
+        },
+        "balance": { "type": "number" },
+        "monthlyRevenue": { "type": "number" },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "fullName", "email", "role"]
+    },
+    "AppConfig": {
+      "title": "App Configuration",
+      "description": "Global settings for the application.",
+      "type": "object",
+      "properties": {
+        "facialVerificationEnabled": { "type": "boolean" },
+        "banners": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "creditBannerUrl": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Individual user profile documents."
+    },
+    "/config/app": {
+      "schema": "AppConfig",
+      "description": "Global application configuration."
+    }
+  }
+}

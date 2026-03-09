@@ -1,0 +1,105 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId} (Auth UID)
+    // Fields:
+    //   - uid: string (required)
+    //   - fullName: string (required)
+    //   - cpf: string
+    //   - email: string (required)
+    //   - phone: string
+    //   - address: string
+    //   - documents: map { frontUrl: string, backUrl: string }
+    //   - balance: number
+    //   - monthlyRevenue: number
+    //   - role: string ('user' or 'admin')
+    //   - createdAt: string (ISO date)
+    //
+    // Collection: config
+    // Document ID: app
+    // Fields:
+    //   - facialVerificationEnabled: boolean
+    //   - banners: list of strings
+    //   - creditBannerUrl: string
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "sophiabeginsky@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'fullName', 'email', 'role']) &&
+             data.uid is string &&
+             data.fullName is string &&
+             data.email is string &&
+             data.role in ['user', 'admin'];
+    }
+
+    function isValidConfig(data) {
+      return data.keys().hasAll(['facialVerificationEnabled', 'banners', 'creditBannerUrl']) &&
+             data.facialVerificationEnabled is bool &&
+             data.banners is list &&
+             data.creditBannerUrl is string;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      // Users can only read their own profile, admins can read all
+      allow read: if isOwner(userId) || isAdmin();
+      
+      // Users can create their own profile, admins can create any
+      allow create: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      
+      // Users can update their own profile, admins can update any
+      allow update: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      
+      // Only admins can delete users
+      allow delete: if isAdmin();
+    }
+
+    match /config/app {
+      // Anyone authenticated can read config
+      allow read: if isAuthenticated();
+      
+      // Only admins can write config
+      allow write: if isAdmin() && isValidConfig(request.resource.data);
+    }
+
+    match /proposals/{proposalId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /revenue_requests/{requestId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+  }
+}

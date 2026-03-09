@@ -1,0 +1,5 @@
+{
+  "name": "EmpireCred",
+  "description": "Plataforma completa de solicitação de crédito pessoal e com garantia veicular.",
+  "requestFramePermissions": ["camera", "microphone"]
+}
