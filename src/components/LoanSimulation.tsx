@@ -429,7 +429,7 @@ export default function LoanSimulation({ profile, setProfile }: { profile: UserP
     if (amount <= 8400) {
       const iof = amount * 0.0289;
       const iss = amount * 0.031;
-      const cet = amount * 0.0549;
+      const cet = amount * 0.0349;
       return iof + iss + cet;
     } else {
       // Taxa aleatória entre 940 e 970
@@ -507,12 +507,8 @@ export default function LoanSimulation({ profile, setProfile }: { profile: UserP
         throw new Error(response.error || "Erro ao gerar pagamento");
       }
 
+      console.log("SigiloPay Result:", response);
       setSigiloPayResult(response);
-      
-      // If it's a boleto, we can also try to open the payment link in a new tab
-      if (method === 'boleto' && response.paymentLink) {
-        window.open(response.paymentLink, '_blank', 'width=800,height=600');
-      }
     } catch (err: any) {
       console.error("SigiloPay Error:", err);
       alert(err.message || "Erro ao gerar pagamento. Tente novamente.");

@@ -116,20 +116,11 @@ async function startServer() {
       const publicKey = process.env.SIGILOPAY_PUBLIC_KEY;
 
       if (!secretKey || !publicKey) {
-        console.error('SigiloPay credentials missing');
-        // Fallback to mock if credentials are missing for testing
-        return res.json({
-          success: true,
-          pixCode: `00020126580014BR.GOV.BCB.PIX0136${Math.random().toString(36).substring(2, 15)}520400005303986540${Number(amount).toFixed(2)}5802BR5913EMPIRECRED6009SAOPAULO62070503***6304${Math.floor(Math.random() * 9999).toString().padStart(4, '0')}`,
-          pixQrCode: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=mock_pix_${amount}`,
-          barcode: `34191.79001 01043.510047 91020.150008 1 ${Math.floor(Math.random() * 9999999999).toString().padStart(10, '0')}`,
-          paymentLink: 'https://sigilopay.com.br/pay/mock_id'
-        });
+        console.error('SigiloPay credentials missing in environment');
+        return res.status(500).json({ error: 'Configuração do SigiloPay incompleta no servidor.' });
       }
 
       // Real API call to SigiloPay
-      // Note: We use a generic endpoint as the exact one isn't specified, 
-      // but we follow standard Brazilian gateway patterns.
       const response = await fetch('https://api.sigilopay.com.br/v1/transaction', {
         method: 'POST',
         headers: {
@@ -141,26 +132,36 @@ async function startServer() {
           amount: Math.round(amount * 100), // convert to cents
           payment_method: method === 'pix' ? 'pix' : 'boleto',
           description: description,
-          items: [{
-            name: description,
-            amount: Math.round(amount * 100),
-            quantity: 1
-          }]
+          return_url: `${process.env.APP_URL || 'https://empirecred.com'}/dashboard`,
+          notification_url: `${process.env.APP_URL || 'https://empirecred.com'}/api/sigilopay/webhook`,
+          // Adicionando campos comuns exigidos por gateways
+          customer: {
+            name: 'Cliente EmpireCred',
+            email: 'cliente@empirecred.com',
+            document: '00000000000' // CPF genérico se não fornecido
+          }
         })
       });
 
+      const data = await response.json();
+      console.log('SigiloPay API Response:', JSON.stringify(data, null, 2));
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'SigiloPay API error');
+        console.error('SigiloPay API Error Response:', data);
+        throw new Error(data.message || 'Erro na API do SigiloPay');
       }
 
-      const data = await response.json();
+      // Mapeamento de campos baseado no retorno comum da SigiloPay
+      const resultData = data.data || data;
+      const pixCode = resultData.pix_code || resultData.copy_paste || resultData.pix_copy_paste || resultData.pix_payload || resultData.payload;
+      const pixQrCode = resultData.pix_qr_code || resultData.qr_code_url || resultData.pix_qr_code_url || resultData.qr_code || (pixCode ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(pixCode)}` : null);
+      
       res.json({
         success: true,
-        pixCode: data.pix_code || data.copy_paste,
-        pixQrCode: data.pix_qr_code || data.qr_code_url,
-        barcode: data.barcode || data.line,
-        paymentLink: data.payment_url || data.pdf_url
+        pixCode: pixCode,
+        pixQrCode: pixQrCode,
+        barcode: resultData.barcode || resultData.line || resultData.digitable_line || resultData.boleto_line || resultData.linha_digitavel,
+        paymentLink: resultData.payment_url || resultData.pdf_url || resultData.boleto_url || resultData.url || resultData.checkout_url
       });
 
     } catch (error: any) {
