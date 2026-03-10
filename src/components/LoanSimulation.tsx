@@ -268,6 +268,12 @@ export default function LoanSimulation({ profile, setProfile }: { profile: UserP
     }
   }, [profile]);
 
+  const parseCurrency = (val: string) => {
+    if (!val) return 0;
+    // Remove pontos de milhar e troca vírgula por ponto para o parseFloat entender
+    return parseFloat(val.replace(/\./g, '').replace(',', '.'));
+  };
+
   const saveRevenueToDb = async (val: string) => {
     if (!profile) return;
     setIsInitialProcessing(true);
@@ -279,15 +285,17 @@ export default function LoanSimulation({ profile, setProfile }: { profile: UserP
       setAnalysisTimeLeft(config.revenueAnalysisTime || 60);
       try {
         const userRef = doc(db, 'users', profile.uid);
+        const numericValue = parseCurrency(val);
+        
         await updateDoc(userRef, { 
-          monthlyRevenue: parseFloat(val),
+          monthlyRevenue: numericValue,
           revenueAnalysisStartedAt: startedAt
         });
         
         // Check if there's a pending request to update
         if (revenueRequest && revenueRequest.status === 'pending') {
           await updateDoc(doc(db, 'revenue_requests', revenueRequest.id!), {
-            revenue: parseFloat(val),
+            revenue: numericValue,
             timestamp: startedAt,
             approvalReason: deleteField(),
             approvedBy: deleteField()
@@ -298,13 +306,13 @@ export default function LoanSimulation({ profile, setProfile }: { profile: UserP
             userId: profile.uid,
             userEmail: profile.email,
             userName: profile.fullName,
-            revenue: parseFloat(val),
+            revenue: numericValue,
             status: 'pending',
             timestamp: startedAt
           });
         }
 
-        localStorage.setItem('empirecred_revenue', val);
+        localStorage.setItem('empirecred_revenue', numericValue.toString());
       } catch (error) {
         handleFirestoreError(error, OperationType.UPDATE, `users/${profile.uid}`);
       }
@@ -604,9 +612,9 @@ export default function LoanSimulation({ profile, setProfile }: { profile: UserP
                           onClick={() => {
                             if (revenue && revenue !== '0,00') {
                               setIsEditingRevenue(false);
-                              const revVal = parseFloat(revenue.replace(/\./g, '').replace(',', '.'));
+                              const revVal = parseCurrency(revenue);
                               if (revVal !== profile?.monthlyRevenue) {
-                                saveRevenueToDb(revVal.toString());
+                                saveRevenueToDb(revenue);
                               }
                             }
                           }}
@@ -619,7 +627,7 @@ export default function LoanSimulation({ profile, setProfile }: { profile: UserP
                     ) : (
                       <div className="bg-zinc-50 rounded-2xl py-4 px-5 border border-zinc-100 flex items-center justify-between">
                         <span className="font-bold text-lg text-zinc-900">
-                          R$ {parseFloat(revenue).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          R$ {parseCurrency(revenue).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                         {isInitialProcessing ? (
                           <div className="flex items-center space-x-2">
@@ -745,7 +753,7 @@ export default function LoanSimulation({ profile, setProfile }: { profile: UserP
                     </div>
                   )}
 
-                  {parseFloat(revenue) > 0 && revenueStatus === 'approved' && (
+                  {parseCurrency(revenue) > 0 && revenueStatus === 'approved' && (
                     <motion.div 
                       initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: 1, scale: 1 }}
@@ -753,7 +761,7 @@ export default function LoanSimulation({ profile, setProfile }: { profile: UserP
                     >
                       <p className="text-xs text-zinc-500 mb-1">Faturamento informado</p>
                       <p className="text-2xl font-bold text-zinc-900">
-                        R$ {parseFloat(revenue).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        R$ {parseCurrency(revenue).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                     </motion.div>
                   )}
