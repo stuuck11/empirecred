@@ -8,7 +8,12 @@ import fs from 'fs';
 const stderrLogStream = fs.createWriteStream(path.join(process.cwd(), 'stderr.log'), { flags: 'a' });
 const originalConsoleError = console.error;
 console.error = (...args) => {
-  const message = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg).join(' ');
+  const message = args.map(arg => {
+    if (arg instanceof Error) {
+      return `${arg.name}: ${arg.message}\n${arg.stack}`;
+    }
+    return typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg;
+  }).join(' ');
   stderrLogStream.write(`[${new Date().toISOString()}] ${message}\n`);
   originalConsoleError.apply(console, args);
 };
@@ -177,8 +182,9 @@ async function startServer() {
       });
 
     } catch (error: any) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.error('SigiloPay Proxy Error:', error);
-      res.status(500).json({ error: error.message || 'Erro ao processar pagamento com SigiloPay' });
+      res.status(500).json({ error: errorMessage || 'Erro ao processar pagamento com SigiloPay' });
     }
   });
 
