@@ -19,10 +19,11 @@ async function startServer() {
       cb(null, uploadDir);
     },
     filename: (req, file, cb) => {
-      // Se for verificação facial e tiver CPF, usa o CPF no nome
-      if (file.fieldname === 'video' && req.body.cpf) {
+      // Se tiver CPF no corpo da requisição, usa o CPF no nome
+      if (req.body.cpf && (file.fieldname === 'video' || file.fieldname === 'front' || file.fieldname === 'back')) {
         const cpf = req.body.cpf.replace(/\D/g, '');
-        cb(null, `video-${cpf}${path.extname(file.originalname) || '.mp4'}`);
+        const prefix = file.fieldname;
+        cb(null, `${prefix}-${cpf}${path.extname(file.originalname) || (file.fieldname === 'video' ? '.mp4' : '.jpg')}`);
       } else {
         // Gera nome único padrão para outros arquivos
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -129,13 +130,23 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    // Em produção, serve os arquivos estáticos da pasta dist
-    const distPath = path.join(process.cwd(), 'dist');
+    // Em produção, serve os arquivos estáticos
+    // Tenta encontrar a pasta 'dist', se não existir usa a raiz (caso o usuário tenha upado o conteúdo de dist direto)
+    const distPath = fs.existsSync(path.join(process.cwd(), 'dist')) 
+      ? path.join(process.cwd(), 'dist') 
+      : process.cwd();
+      
+    console.log(`Servindo arquivos estáticos de: ${distPath}`);
     app.use(express.static(distPath));
     
     // Fallback para SPA: envia o index.html para qualquer rota não encontrada
     app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+      const indexPath = path.join(distPath, 'index.html');
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        res.status(404).send('index.html não encontrado no servidor. Verifique o build.');
+      }
     });
   }
 
