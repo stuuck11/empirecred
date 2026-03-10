@@ -1,10 +1,8 @@
+import 'dotenv/config';
 import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import dotenv from 'dotenv';
-
-dotenv.config();
 
 async function startServer() {
   const app = express();
