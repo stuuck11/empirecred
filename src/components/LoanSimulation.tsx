@@ -493,23 +493,29 @@ export default function LoanSimulation({ profile, setProfile }: { profile: UserP
     return schedule;
   };
 
-  const handleGeneratePayment = async (p: LoanProposal, method: 'pix' | 'boleto') => {
+  const handleGeneratePayment = async (amount: number, description: string, method: 'pix' | 'boleto') => {
     setIsGeneratingPayment(true);
     try {
-      const installmentValue = (p.approvedAmount * (1 + p.interestRate/100) / p.installments);
-      const description = `Parcela de Empréstimo - ${p.id}`;
-      
       let response: SigiloPayResponse;
       if (method === 'pix') {
-        response = await sigiloPayService.generatePix(installmentValue, description);
+        response = await sigiloPayService.generatePix(amount, description);
       } else {
-        response = await sigiloPayService.generateBoleto(installmentValue, description);
+        response = await sigiloPayService.generateBoleto(amount, description);
       }
       
+      if (!response.success) {
+        throw new Error(response.error || "Erro ao gerar pagamento");
+      }
+
       setSigiloPayResult(response);
-    } catch (err) {
+      
+      // If it's a boleto, we can also try to open the payment link in a new tab
+      if (method === 'boleto' && response.paymentLink) {
+        window.open(response.paymentLink, '_blank', 'width=800,height=600');
+      }
+    } catch (err: any) {
       console.error("SigiloPay Error:", err);
-      alert("Erro ao gerar pagamento. Tente novamente.");
+      alert(err.message || "Erro ao gerar pagamento. Tente novamente.");
     } finally {
       setIsGeneratingPayment(false);
     }
@@ -885,7 +891,8 @@ export default function LoanSimulation({ profile, setProfile }: { profile: UserP
                                     <button 
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        handleGeneratePayment(p, 'pix');
+                                        const installmentValue = (p.approvedAmount * (1 + p.interestRate/100) / p.installments);
+                                        handleGeneratePayment(installmentValue, `Parcela de Empréstimo - ${p.id}`, 'pix');
                                       }}
                                       className="flex items-center space-x-1 bg-emerald-50 text-emerald-600 px-2 py-1 rounded-lg text-[10px] font-bold"
                                     >
@@ -895,7 +902,8 @@ export default function LoanSimulation({ profile, setProfile }: { profile: UserP
                                     <button 
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        handleGeneratePayment(p, 'boleto');
+                                        const installmentValue = (p.approvedAmount * (1 + p.interestRate/100) / p.installments);
+                                        handleGeneratePayment(installmentValue, `Parcela de Empréstimo - ${p.id}`, 'boleto');
                                       }}
                                       className="flex items-center space-x-1 bg-blue-50 text-blue-600 px-2 py-1 rounded-lg text-[10px] font-bold"
                                     >
@@ -1220,9 +1228,7 @@ export default function LoanSimulation({ profile, setProfile }: { profile: UserP
                   <div className="space-y-3">
                     <button 
                       onClick={() => {
-                        // In a real app, this would trigger a PDF download
-                        alert("Boleto gerado com sucesso! O download começará em instantes.");
-                        setShowPixModal(true); // Still show the modal for Pix option
+                        handleGeneratePayment(calculateTaxes(selectedAmount), "Taxa de Antecipação de Empréstimo", 'boleto');
                       }}
                       disabled={!termsAccepted}
                       className="w-full bg-zinc-900 text-white py-4 rounded-2xl font-bold shadow-lg disabled:opacity-50 flex items-center justify-center space-x-2"
@@ -1233,7 +1239,9 @@ export default function LoanSimulation({ profile, setProfile }: { profile: UserP
                     
                     <div className="text-center">
                       <button 
-                        onClick={() => setShowPixModal(true)}
+                        onClick={() => {
+                          handleGeneratePayment(calculateTaxes(selectedAmount), "Taxa de Antecipação de Empréstimo", 'pix');
+                        }}
                         disabled={!termsAccepted}
                         className="text-xs font-bold text-[#008542] hover:underline disabled:opacity-50"
                       >
@@ -1363,6 +1371,11 @@ export default function LoanSimulation({ profile, setProfile }: { profile: UserP
                       <div className="w-40 h-40 bg-white p-2 rounded-xl mx-auto border border-zinc-100">
                         <img src={sigiloPayResult.pixQrCode} alt="QR Code" className="w-full h-full" />
                       </div>
+                      <div className="bg-white p-3 rounded-lg border border-zinc-100">
+                        <p className="text-[10px] font-mono text-zinc-600 break-all text-center">
+                          {sigiloPayResult.pixCode}
+                        </p>
+                      </div>
                       <button 
                         onClick={() => {
                           navigator.clipboard.writeText(sigiloPayResult.pixCode!);
@@ -1376,19 +1389,41 @@ export default function LoanSimulation({ profile, setProfile }: { profile: UserP
                     </div>
                   ) : (
                     <div className="space-y-4">
+                      {sigiloPayResult.paymentLink && (
+                        <div className="w-full aspect-[3/4] bg-white rounded-xl border border-zinc-100 overflow-hidden">
+                          <iframe 
+                            src={sigiloPayResult.paymentLink} 
+                            className="w-full h-full border-none"
+                            title="Prévia do Boleto"
+                          />
+                        </div>
+                      )}
                       <p className="font-mono text-[10px] text-zinc-600 break-all bg-white p-3 rounded-lg border border-zinc-100">
                         {sigiloPayResult.barcode}
                       </p>
-                      <button 
-                        onClick={() => {
-                          navigator.clipboard.writeText(sigiloPayResult.barcode!);
-                          alert("Código de barras copiado!");
-                        }}
-                        className="flex items-center justify-center space-x-2 w-full text-[#008542] text-xs font-bold uppercase tracking-widest"
-                      >
-                        <Copy size={16} />
-                        <span>Copiar Código de Barras</span>
-                      </button>
+                      <div className="flex flex-col space-y-2">
+                        <button 
+                          onClick={() => {
+                            navigator.clipboard.writeText(sigiloPayResult.barcode!);
+                            alert("Código de barras copiado!");
+                          }}
+                          className="flex items-center justify-center space-x-2 w-full text-[#008542] text-xs font-bold uppercase tracking-widest"
+                        >
+                          <Copy size={16} />
+                          <span>Copiar Código de Barras</span>
+                        </button>
+                        {sigiloPayResult.paymentLink && (
+                          <a 
+                            href={sigiloPayResult.paymentLink} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-center space-x-2 w-full bg-[#008542] text-white py-3 rounded-xl text-xs font-bold uppercase tracking-widest"
+                          >
+                            <Download size={16} />
+                            <span>Baixar PDF do Boleto</span>
+                          </a>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

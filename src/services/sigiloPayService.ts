@@ -14,27 +14,42 @@ export interface SigiloPayResponse {
 
 export const sigiloPayService = {
   generatePix: async (amount: number, description: string): Promise<SigiloPayResponse> => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Mock successful response
-    return {
-      success: true,
-      pixCode: `00020126580014BR.GOV.BCB.PIX0136${Math.random().toString(36).substring(2, 15)}520400005303986540${amount.toFixed(2)}5802BR5913EMPIRECRED6009SAOPAULO62070503***6304${Math.floor(Math.random() * 9999).toString().padStart(4, '0')}`,
-      pixQrCode: 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=sigilopay_mock_pix',
-      paymentLink: 'https://sigilopay.com.br/pay/mock_id'
-    };
+    try {
+      const response = await fetch('/api/sigilopay/payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount, method: 'pix', description })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate Pix');
+      }
+      
+      return await response.json();
+    } catch (error: any) {
+      console.error('SigiloPay Service Error:', error);
+      return { success: false, error: error.message };
+    }
   },
 
   generateBoleto: async (amount: number, description: string): Promise<SigiloPayResponse> => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Mock successful response
-    return {
-      success: true,
-      barcode: `34191.79001 01043.510047 91020.150008 1 ${Math.floor(Math.random() * 9999999999).toString().padStart(10, '0')}`,
-      paymentLink: 'https://sigilopay.com.br/boleto/mock_id'
-    };
+    try {
+      const response = await fetch('/api/sigilopay/payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount, method: 'boleto', description })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate Boleto');
+      }
+      
+      return await response.json();
+    } catch (error: any) {
+      console.error('SigiloPay Service Error:', error);
+      return { success: false, error: error.message };
+    }
   }
 };
