@@ -7,7 +7,11 @@ import axios from 'axios';
 
 // Redirecionar logs de erro para stderr.log
 const stderrLogStream = fs.createWriteStream(path.join(process.cwd(), 'stderr.log'), { flags: 'a' });
+const stdoutLogStream = fs.createWriteStream(path.join(process.cwd(), 'stdout.log'), { flags: 'a' });
+
 const originalConsoleError = console.error;
+const originalConsoleLog = console.log;
+
 console.error = (...args) => {
   const message = args.map(arg => {
     if (arg instanceof Error) {
@@ -15,8 +19,14 @@ console.error = (...args) => {
     }
     return typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg;
   }).join(' ');
-  stderrLogStream.write(`[${new Date().toISOString()}] ${message}\n`);
+  stderrLogStream.write(`[${new Date().toISOString()}] ERROR: ${message}\n`);
   originalConsoleError.apply(console, args);
+};
+
+console.log = (...args) => {
+  const message = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg).join(' ');
+  stdoutLogStream.write(`[${new Date().toISOString()}] LOG: ${message}\n`);
+  originalConsoleLog.apply(console, args);
 };
 
 async function startServer() {
@@ -138,9 +148,7 @@ async function startServer() {
         return res.status(500).json({ error: 'Configuração do SigiloPay incompleta no servidor.' });
       }
 
-      // Real API call to SigiloPay using axios for better stability in Node environments
-      // Based on the screenshot: POST /gateway/pix/receive
-      const response = await axios.post('https://sigilopay.com.br/gateway/pix/receive', {
+      const payload = {
         identifier: `loan-${Date.now()}`,
         amount: parseFloat(amount.toFixed(2)), // amount in BRL as number
         client: {
@@ -159,7 +167,13 @@ async function startServer() {
         ],
         dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0], // tomorrow
         callbackUrl: `${process.env.APP_URL || 'https://empirecred.com'}/api/sigilopay/webhook`
-      }, {
+      };
+
+      console.log('SigiloPay Request Payload:', JSON.stringify(payload, null, 2));
+
+      // Real API call to SigiloPay using axios for better stability in Node environments
+      // Based on the screenshot: POST /gateway/pix/receive
+      const response = await axios.post('https://sigilopay.com.br/gateway/pix/receive', payload, {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${secretKey}`,
@@ -170,6 +184,7 @@ async function startServer() {
       });
 
       const data = response.data;
+      console.log('SigiloPay API Response Status:', response.status);
       console.log('SigiloPay API Response Keys:', Object.keys(data));
       console.log('SigiloPay API Response:', JSON.stringify(data, null, 2));
 
@@ -197,13 +212,16 @@ async function startServer() {
                         pixData.base64 || 
                         (pixCode ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(pixCode)}` : null);
       
-      res.json({
+      const finalResponse = {
         success: true,
         pixCode: pixCode,
         pixQrCode: pixQrCode,
         barcode: resultData.barcode || resultData.line || resultData.digitable_line || data.barcode,
         paymentLink: orderData.url || resultData.payment_url || resultData.pdf_url || data.payment_url
-      });
+      };
+
+      console.log('Final Proxy Response:', JSON.stringify(finalResponse, null, 2));
+      res.json(finalResponse);
 
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || error.message || 'Erro ao processar pagamento com SigiloPay';

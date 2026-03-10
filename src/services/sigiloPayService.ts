@@ -21,12 +21,14 @@ export const sigiloPayService = {
         body: JSON.stringify({ amount, method: 'pix', description })
       });
       
+      const data = await response.json();
+      console.log('SigiloPay Client Response:', data);
+      
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate Pix');
+        throw new Error(data.error || 'Failed to generate Pix');
       }
       
-      return await response.json();
+      return data;
     } catch (error: any) {
       console.error('SigiloPay Service Error:', error);
       return { success: false, error: error.message };
@@ -41,12 +43,14 @@ export const sigiloPayService = {
         body: JSON.stringify({ amount, method: 'boleto', description })
       });
       
+      const data = await response.json();
+      console.log('SigiloPay Boleto Client Response:', data);
+      
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate Boleto');
+        throw new Error(data.error || 'Failed to generate Boleto');
       }
       
-      return await response.json();
+      return data;
     } catch (error: any) {
       console.error('SigiloPay Service Error:', error);
       return { success: false, error: error.message };

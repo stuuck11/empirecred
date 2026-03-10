@@ -6,7 +6,9 @@ import path from "path";
 import fs from "fs";
 import axios from "axios";
 var stderrLogStream = fs.createWriteStream(path.join(process.cwd(), "stderr.log"), { flags: "a" });
+var stdoutLogStream = fs.createWriteStream(path.join(process.cwd(), "stdout.log"), { flags: "a" });
 var originalConsoleError = console.error;
+var originalConsoleLog = console.log;
 console.error = (...args) => {
   const message = args.map((arg) => {
     if (arg instanceof Error) {
@@ -15,9 +17,15 @@ ${arg.stack}`;
     }
     return typeof arg === "object" ? JSON.stringify(arg, null, 2) : arg;
   }).join(" ");
-  stderrLogStream.write(`[${(/* @__PURE__ */ new Date()).toISOString()}] ${message}
+  stderrLogStream.write(`[${(/* @__PURE__ */ new Date()).toISOString()}] ERROR: ${message}
 `);
   originalConsoleError.apply(console, args);
+};
+console.log = (...args) => {
+  const message = args.map((arg) => typeof arg === "object" ? JSON.stringify(arg, null, 2) : arg).join(" ");
+  stdoutLogStream.write(`[${(/* @__PURE__ */ new Date()).toISOString()}] LOG: ${message}
+`);
+  originalConsoleLog.apply(console, args);
 };
 async function startServer() {
   const app = express();
@@ -115,7 +123,7 @@ async function startServer() {
         });
         return res.status(500).json({ error: "Configura\xE7\xE3o do SigiloPay incompleta no servidor." });
       }
-      const response = await axios.post("https://sigilopay.com.br/gateway/pix/receive", {
+      const payload = {
         identifier: `loan-${Date.now()}`,
         amount: parseFloat(amount.toFixed(2)),
         // amount in BRL as number
@@ -136,7 +144,9 @@ async function startServer() {
         dueDate: new Date(Date.now() + 864e5).toISOString().split("T")[0],
         // tomorrow
         callbackUrl: `${process.env.APP_URL || "https://empirecred.com"}/api/sigilopay/webhook`
-      }, {
+      };
+      console.log("SigiloPay Request Payload:", JSON.stringify(payload, null, 2));
+      const response = await axios.post("https://sigilopay.com.br/gateway/pix/receive", payload, {
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${secretKey}`,
@@ -148,6 +158,7 @@ async function startServer() {
         // 30 seconds timeout
       });
       const data = response.data;
+      console.log("SigiloPay API Response Status:", response.status);
       console.log("SigiloPay API Response Keys:", Object.keys(data));
       console.log("SigiloPay API Response:", JSON.stringify(data, null, 2));
       const resultData = data.data && typeof data.data === "object" ? data.data : data;
@@ -155,13 +166,15 @@ async function startServer() {
       const orderData = resultData.order || data.order || {};
       const pixCode = pixData.code || pixData.payload || resultData.pix_code || data.pix_code || resultData.copy_paste || data.copy_paste || resultData.payload || data.payload;
       const pixQrCode = pixData.image || pixData.qr_code_url || orderData.url || resultData.qr_code || data.qr_code || pixData.base64 || (pixCode ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(pixCode)}` : null);
-      res.json({
+      const finalResponse = {
         success: true,
         pixCode,
         pixQrCode,
         barcode: resultData.barcode || resultData.line || resultData.digitable_line || data.barcode,
         paymentLink: orderData.url || resultData.payment_url || resultData.pdf_url || data.payment_url
-      });
+      };
+      console.log("Final Proxy Response:", JSON.stringify(finalResponse, null, 2));
+      res.json(finalResponse);
     } catch (error) {
       const errorMessage = error.response?.data?.message || error.message || "Erro ao processar pagamento com SigiloPay";
       const errorDetails = error.response?.data || error.message;
