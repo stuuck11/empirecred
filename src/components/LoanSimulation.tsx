@@ -14,8 +14,8 @@ export default function LoanSimulation({ profile, setProfile }: { profile: UserP
 
   const [step, setStep] = useState(1);
   const [revenue, setRevenue] = useState(() => {
-    const val = profile?.monthlyRevenue?.toString() || localStorage.getItem('empirecred_revenue') || location.state?.revenue?.toString() || '0';
-    return val;
+    const val = profile?.monthlyRevenue || Number(localStorage.getItem('empirecred_revenue')) || Number(location.state?.revenue) || 0;
+    return val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   });
 
   const [isEditingRevenue, setIsEditingRevenue] = useState(true);
@@ -70,12 +70,13 @@ export default function LoanSimulation({ profile, setProfile }: { profile: UserP
 
   const handleProofUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !revenueRequest) return;
+    if (!file || !revenueRequest || !profile) return;
 
     setIsUploadingProof(true);
     try {
       const formData = new FormData();
       formData.append('proof', file);
+      formData.append('cpf', profile.cpf); // Envia o CPF para o nome do arquivo
 
       const response = await fetch('/api/upload-proof', {
         method: 'POST',
@@ -261,9 +262,9 @@ export default function LoanSimulation({ profile, setProfile }: { profile: UserP
 
   useEffect(() => {
     if (profile?.monthlyRevenue !== undefined) {
-      const val = profile.monthlyRevenue.toString();
+      const val = profile.monthlyRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       setRevenue(val);
-      setIsEditingRevenue(val === '0' || !val);
+      setIsEditingRevenue(profile.monthlyRevenue === 0);
     }
   }, [profile]);
 
@@ -413,9 +414,17 @@ export default function LoanSimulation({ profile, setProfile }: { profile: UserP
   };
 
   const calculateTaxes = (amount: number) => {
-    // Valor final da taxa deve ser entre 926 - 974
-    // Usando base de 945 + 0.1% do valor (máximo 20.00) = 965.00
-    return 945 + (amount * 0.001);
+    // Manter os impostos de IOF 2,89%, ISS 3,1% e CET 5,49% para empréstimos de até 8400 reais
+    // e CASO o valor for maior que 8400 cobrar uma taxa aleatória entre 940 e 970 reais
+    if (amount <= 8400) {
+      const iof = amount * 0.0289;
+      const iss = amount * 0.031;
+      const cet = amount * 0.0549;
+      return iof + iss + cet;
+    } else {
+      // Taxa aleatória entre 940 e 970
+      return Math.floor(Math.random() * (970 - 940 + 1)) + 940;
+    }
   };
 
   const calculateInstallment = (amount: number, months: number) => {
@@ -571,25 +580,41 @@ export default function LoanSimulation({ profile, setProfile }: { profile: UserP
                     </div>
                     
                     {isEditingRevenue ? (
-                      <div className="relative">
-                        <span className="absolute left-5 top-1/2 -translate-y-1/2 font-bold text-zinc-400">R$</span>
-                        <input 
-                          type="number" 
-                          value={revenue}
-                          onChange={e => setRevenue(e.target.value)}
-                          onBlur={() => {
-                            if (revenue && revenue !== '0') {
+                      <div className="space-y-4">
+                        <div className="relative">
+                          <span className="absolute left-5 top-1/2 -translate-y-1/2 font-bold text-zinc-400">R$</span>
+                          <input 
+                            type="text" 
+                            inputMode="numeric"
+                            value={revenue}
+                            onChange={e => {
+                              const val = e.target.value.replace(/\D/g, '');
+                              const formatted = (Number(val) / 100).toLocaleString('pt-BR', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2
+                              });
+                              setRevenue(formatted);
+                            }}
+                            placeholder="0,00"
+                            autoFocus
+                            className="w-full bg-zinc-50 border-none rounded-2xl py-4 pl-12 pr-5 text-lg font-bold focus:ring-2 focus:ring-[#008542] outline-none"
+                          />
+                        </div>
+                        <button 
+                          onClick={() => {
+                            if (revenue && revenue !== '0,00') {
                               setIsEditingRevenue(false);
-                              const revVal = parseFloat(revenue);
+                              const revVal = parseFloat(revenue.replace(/\./g, '').replace(',', '.'));
                               if (revVal !== profile?.monthlyRevenue) {
-                                saveRevenueToDb(revenue);
+                                saveRevenueToDb(revVal.toString());
                               }
                             }
                           }}
-                          placeholder="0,00"
-                          autoFocus
-                          className="w-full bg-zinc-50 border-none rounded-2xl py-4 pl-12 pr-5 text-lg font-bold focus:ring-2 focus:ring-[#008542] outline-none"
-                        />
+                          className="w-full bg-zinc-900 text-white py-4 rounded-2xl font-bold shadow-lg flex items-center justify-center space-x-2"
+                        >
+                          <Check size={20} />
+                          <span>Confirmar Faturamento</span>
+                        </button>
                       </div>
                     ) : (
                       <div className="bg-zinc-50 rounded-2xl py-4 px-5 border border-zinc-100 flex items-center justify-between">

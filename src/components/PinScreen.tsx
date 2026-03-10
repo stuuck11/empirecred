@@ -49,8 +49,6 @@ export default function PinScreen({ profile, onVerified, onLogout, initialMode }
     } else if (value && index === 5) {
       // Auto confirm
       setTimeout(() => {
-        const currentPin = isConfirm ? [...confirmPin] : [...pin];
-        currentPin[index] = value.slice(-1);
         const pinString = currentPin.join('');
         
         if (mode === 'entry') {

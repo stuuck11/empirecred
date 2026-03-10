@@ -19,7 +19,7 @@ async function startServer() {
     },
     filename: (req, file, cb) => {
       // Se tiver CPF no corpo da requisição, usa o CPF no nome
-      if (req.body.cpf && (file.fieldname === 'video' || file.fieldname === 'front' || file.fieldname === 'back')) {
+      if (req.body.cpf && (file.fieldname === 'video' || file.fieldname === 'front' || file.fieldname === 'back' || file.fieldname === 'proof')) {
         const cpf = req.body.cpf.replace(/\D/g, '');
         const prefix = file.fieldname;
         cb(null, `${prefix}-${cpf}${path.extname(file.originalname) || (file.fieldname === 'video' ? '.mp4' : '.jpg')}`);
@@ -50,9 +50,9 @@ async function startServer() {
     { name: 'back', maxCount: 1 }
   ]), (req, res) => {
     try {
-      const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+      const files = req.files as any;
       
-      if (!files.front || !files.back) {
+      if (!files || !files.front || !files.back) {
         return res.status(400).json({ error: 'Ambos os arquivos (frente e verso) são obrigatórios.' });
       }
 
@@ -114,7 +114,7 @@ async function startServer() {
   });
 
   // Error handler for Multer and other errors
-  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  app.use((err, req, res, next) => {
     console.error('Server Error:', err);
     res.status(err.status || 500).json({
       error: err.message || 'Erro interno no servidor'

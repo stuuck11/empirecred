@@ -41,7 +41,7 @@ async function startServer() {
   ]), (req, res) => {
     try {
       const files = req.files;
-      if (!files.front || !files.back) {
+      if (!files || !files.front || !files.back) {
         return res.status(400).json({ error: "Ambos os arquivos (frente e verso) s\xE3o obrigat\xF3rios." });
       }
       res.json({

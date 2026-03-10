@@ -56,9 +56,8 @@ export default function FacialVerification({ profile, setProfile }: { profile: U
           const stream = await navigator.mediaDevices.getUserMedia({ 
             video: { 
               facingMode: 'user',
-              width: { ideal: 720 },
-              height: { ideal: 720 },
-              aspectRatio: { ideal: 1 }
+              width: { ideal: 1920 },
+              height: { ideal: 1080 }
             }, 
             audio: false 
           });
@@ -74,7 +73,10 @@ export default function FacialVerification({ profile, setProfile }: { profile: U
             ? 'video/mp4' 
             : (MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' : '');
             
-          const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+          const mediaRecorder = new MediaRecorder(stream, {
+            mimeType: mimeType || undefined,
+            videoBitsPerSecond: 5000000 // 5Mbps for high quality
+          });
           mediaRecorderRef.current = mediaRecorder;
           chunksRef.current = [];
 
@@ -242,24 +244,74 @@ export default function FacialVerification({ profile, setProfile }: { profile: U
             animate={{ opacity: 1 }}
             className="flex-1 flex flex-col items-center justify-between py-12"
           >
-            <div className="text-center space-y-2">
-              <p className="text-emerald-500 font-bold uppercase tracking-widest text-xs">{instruction}</p>
-              <p className="text-4xl font-mono font-bold">{timeLeft}s</p>
+            <div className="text-center w-full px-4">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={instruction}
+                  initial={{ opacity: 0, y: 20, scale: 0.8 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -20, scale: 0.8 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                  className="bg-emerald-500 text-white px-8 py-4 rounded-2xl inline-block shadow-2xl shadow-emerald-500/40 border-2 border-white/20"
+                >
+                  <p className="font-black uppercase tracking-widest text-xl italic">{instruction}</p>
+                </motion.div>
+              </AnimatePresence>
             </div>
 
-            <div className="relative w-72 h-72">
-              <div className="absolute inset-0 border-4 border-emerald-500 rounded-full z-10 animate-pulse"></div>
-              <video 
-                ref={videoRef} 
-                autoPlay 
-                muted 
-                playsInline 
-                className="w-full h-full object-cover rounded-full bg-zinc-800 -scale-x-100"
+            <div className="relative w-80 h-80 flex items-center justify-center">
+              {/* Rotating outer ring */}
+              <motion.div 
+                className="absolute inset-0 border-2 border-dashed border-emerald-500/40 rounded-full"
+                animate={{ rotate: 360 }}
+                transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
               />
+              
+              {/* Pulsing middle ring */}
+              <motion.div 
+                className="absolute inset-4 border-2 border-emerald-500/20 rounded-full"
+                animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.6, 0.3] }}
+                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+              />
+
+              {/* Scanning line animation */}
+              <motion.div 
+                className="absolute left-10 right-10 h-1 bg-emerald-400/60 z-20 blur-[2px] rounded-full"
+                animate={{ top: ['20%', '80%', '20%'] }}
+                transition={{ duration: 2.5, repeat: Infinity, ease: "linear" }}
+              />
+
+              {/* Corner markers */}
+              <div className="absolute inset-0 z-20 pointer-events-none">
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1 h-4 bg-emerald-500 rounded-full" />
+                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-4 bg-emerald-500 rounded-full" />
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 h-1 w-4 bg-emerald-500 rounded-full" />
+                <div className="absolute right-0 top-1/2 -translate-y-1/2 h-1 w-4 bg-emerald-500 rounded-full" />
+              </div>
+
+              <div className="relative w-64 h-64 overflow-hidden rounded-full border-4 border-emerald-500 shadow-[0_0_50px_rgba(16,185,129,0.3)] z-10">
+                <video 
+                  ref={videoRef} 
+                  autoPlay 
+                  muted 
+                  playsInline 
+                  className="w-full h-full object-cover -scale-x-100"
+                />
+                
+                {/* Overlay gradient for depth */}
+                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-emerald-500/5 to-transparent pointer-events-none" />
+              </div>
             </div>
 
             <div className="text-center space-y-4">
-              <p className="text-[10px] text-zinc-500 uppercase tracking-widest">Gravando automaticamente...</p>
+              <motion.div
+                animate={{ opacity: [0.4, 1, 0.4] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+                className="flex items-center space-x-2 bg-zinc-800/50 px-4 py-2 rounded-full border border-zinc-700"
+              >
+                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                <p className="text-[10px] text-zinc-300 font-bold uppercase tracking-widest">Análise Biométrica em Tempo Real</p>
+              </motion.div>
             </div>
           </motion.div>
         )}
