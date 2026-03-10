@@ -266,27 +266,27 @@ export default function FacialVerification({ profile, setProfile }: { profile: U
             <div className="relative w-80 h-[400px] flex items-center justify-center">
               {/* Pulsing middle ring - Oval */}
               <motion.div 
-                className="absolute inset-x-4 inset-y-8 border-2 border-emerald-500/20 rounded-[100%/120%]"
+                className="absolute inset-x-2 inset-y-4 border-2 border-emerald-500/20 rounded-[100%/120%]"
                 animate={{ scale: [1, 1.05, 1], opacity: [0.3, 0.6, 0.3] }}
                 transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
               />
 
               {/* Scanning line animation */}
               <motion.div 
-                className="absolute left-12 right-12 h-1 bg-emerald-400/80 z-20 blur-[1px] rounded-full shadow-[0_0_15px_rgba(52,211,153,0.8)]"
-                animate={{ top: ['15%', '85%', '15%'] }}
+                className="absolute left-8 right-8 h-1 bg-emerald-400/80 z-20 blur-[1px] rounded-full shadow-[0_0_15px_rgba(52,211,153,0.8)]"
+                animate={{ top: ['10%', '90%', '10%'] }}
                 transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
               />
 
               {/* Corner markers - Oval style */}
               <div className="absolute inset-0 z-20 pointer-events-none">
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 w-1 h-6 bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-1 h-6 bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 h-1 w-6 bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 h-1 w-6 bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
+                <div className="absolute top-2 left-1/2 -translate-x-1/2 w-1 h-6 bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
+                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-1 h-6 bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
+                <div className="absolute left-2 top-1/2 -translate-y-1/2 h-1 w-6 bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 h-1 w-6 bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
               </div>
 
-              <div className="relative w-64 h-80 overflow-hidden rounded-[100%/120%] border-4 border-emerald-500 shadow-[0_0_50px_rgba(16,185,129,0.3)] z-10">
+              <div className="relative w-72 h-[360px] overflow-hidden rounded-[100%/120%] border-4 border-emerald-500 shadow-[0_0_50px_rgba(16,185,129,0.3)] z-10">
                 <video 
                   ref={videoRef} 
                   autoPlay 
