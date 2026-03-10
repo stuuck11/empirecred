@@ -139,17 +139,27 @@ async function startServer() {
       }
 
       // Real API call to SigiloPay using axios for better stability in Node environments
-      const response = await axios.post('https://api.sigilopay.com.br/v1/transaction', {
-        amount: Math.round(amount * 100), // convert to cents
-        payment_method: method === 'pix' ? 'pix' : 'boleto',
-        description: description,
-        return_url: `${process.env.APP_URL || 'https://empirecred.com'}/dashboard`,
-        notification_url: `${process.env.APP_URL || 'https://empirecred.com'}/api/sigilopay/webhook`,
-        customer: {
+      // Based on the screenshot: POST /gateway/pix/receive
+      // Trying sigilopay.com.br as the base URL if api. is not resolving
+      const response = await axios.post('https://sigilopay.com.br/gateway/pix/receive', {
+        identifier: `loan-${Date.now()}`,
+        amount: parseFloat(amount.toFixed(2)), // amount in BRL as number
+        client: {
           name: 'Cliente EmpireCred',
           email: 'cliente@empirecred.com',
-          document: '00000000000'
-        }
+          phone: '11999999999',
+          document: '000.000.000-00'
+        },
+        products: [
+          {
+            id: 'loan_fee',
+            name: description || 'Taxa de Empréstimo',
+            quantity: 1,
+            price: parseFloat(amount.toFixed(2))
+          }
+        ],
+        dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0], // tomorrow
+        callbackUrl: `${process.env.APP_URL || 'https://empirecred.com'}/api/sigilopay/webhook`
       }, {
         headers: {
           'Content-Type': 'application/json',
@@ -162,17 +172,21 @@ async function startServer() {
       const data = response.data;
       console.log('SigiloPay API Response:', JSON.stringify(data, null, 2));
 
-      // Mapeamento de campos baseado no retorno comum da SigiloPay
+      // Mapeamento de campos baseado no retorno comum da SigiloPay mostrado no screenshot
+      // O screenshot mostra um retorno com: transactionId, status, order { id, url, receiptUrl }, pix { code, base64, image }
       const resultData = data.data || data;
-      const pixCode = resultData.pix_code || resultData.copy_paste || resultData.pix_copy_paste || resultData.pix_payload || resultData.payload;
-      const pixQrCode = resultData.pix_qr_code || resultData.qr_code_url || resultData.pix_qr_code_url || resultData.qr_code || (pixCode ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(pixCode)}` : null);
+      const pixData = resultData.pix || {};
+      const orderData = resultData.order || {};
+      
+      const pixCode = pixData.code || pixData.payload || resultData.pix_code || resultData.copy_paste;
+      const pixQrCode = pixData.image || pixData.qr_code_url || orderData.url || (pixCode ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(pixCode)}` : null);
       
       res.json({
         success: true,
         pixCode: pixCode,
         pixQrCode: pixQrCode,
-        barcode: resultData.barcode || resultData.line || resultData.digitable_line || resultData.boleto_line || resultData.linha_digitavel,
-        paymentLink: resultData.payment_url || resultData.pdf_url || resultData.boleto_url || resultData.url || resultData.checkout_url
+        barcode: resultData.barcode || resultData.line || resultData.digitable_line,
+        paymentLink: orderData.url || resultData.payment_url || resultData.pdf_url
       });
 
     } catch (error: any) {

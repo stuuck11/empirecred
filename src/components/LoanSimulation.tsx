@@ -403,7 +403,7 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
     const req = parseFloat(requestedAmount);
     
     if (req < 500) {
-      setError('NENHUMA OFERTA DISPONÍVEL');
+      setOffer({ approved: false, amount: 0 });
       return;
     }
     
