@@ -264,16 +264,6 @@ export default function FacialVerification({ profile, setProfile }: { profile: U
             </div>
 
             <div className="relative w-80 h-[400px] flex items-center justify-center">
-              {/* Rotating outer ring - Oval */}
-              <motion.div 
-                className="absolute inset-0 border-2 border-dashed border-emerald-500/40 rounded-[100%/120%]"
-                animate={{ rotate: 360, scale: [1, 1.02, 1] }}
-                transition={{ 
-                  rotate: { duration: 10, repeat: Infinity, ease: "linear" },
-                  scale: { duration: 4, repeat: Infinity, ease: "easeInOut" }
-                }}
-              />
-              
               {/* Pulsing middle ring - Oval */}
               <motion.div 
                 className="absolute inset-x-4 inset-y-8 border-2 border-emerald-500/20 rounded-[100%/120%]"
