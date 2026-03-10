@@ -268,10 +268,12 @@ export default function LoanSimulation({ profile, setProfile }: { profile: UserP
     }
   }, [profile]);
 
-  const parseCurrency = (val: string) => {
+  const parseCurrency = (val: string | number) => {
+    if (typeof val === 'number') return val;
     if (!val) return 0;
-    // Remove pontos de milhar e troca vírgula por ponto para o parseFloat entender
-    return parseFloat(val.replace(/\./g, '').replace(',', '.'));
+    // Remove tudo que não é dígito ou vírgula, depois troca vírgula por ponto
+    const clean = val.toString().replace(/[^\d,]/g, '').replace(',', '.');
+    return parseFloat(clean) || 0;
   };
 
   const saveRevenueToDb = async (val: string) => {
@@ -388,7 +390,7 @@ export default function LoanSimulation({ profile, setProfile }: { profile: UserP
     setTimeout(() => {
       setAnalyzing(false);
       if (config.facialVerificationEnabled && !location.state?.verified && !profile?.facialVerificationUrl) {
-        navigate('/verification', { state: { revenue: parseFloat(revenue), type } });
+        navigate('/verification', { state: { revenue: parseCurrency(revenue), type } });
       } else {
         setStep(2);
       }
@@ -396,7 +398,7 @@ export default function LoanSimulation({ profile, setProfile }: { profile: UserP
   };
 
   const handleSimulate = () => {
-    const rev = parseFloat(revenue);
+    const rev = parseCurrency(revenue);
     const req = parseFloat(requestedAmount);
     
     setAnalyzing(true);
@@ -453,7 +455,7 @@ export default function LoanSimulation({ profile, setProfile }: { profile: UserP
       const proposal: LoanProposal = {
         userId: profile.uid,
         type: type as 'personal' | 'vehicle',
-        monthlyRevenue: parseFloat(revenue),
+        monthlyRevenue: parseCurrency(revenue),
         requestedAmount: parseFloat(requestedAmount),
         approvedAmount: selectedAmount,
         installments: installments,
@@ -577,7 +579,7 @@ export default function LoanSimulation({ profile, setProfile }: { profile: UserP
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
                       <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Informe seu faturamento mensal</label>
-                      {parseFloat(revenue) > 0 && !isEditingRevenue && (
+                      {parseCurrency(revenue) > 0 && !isEditingRevenue && (
                         <button 
                           onClick={() => setIsEditingRevenue(true)}
                           className="text-[#008542] text-[10px] font-bold uppercase tracking-widest hover:underline print:hidden"
@@ -627,7 +629,7 @@ export default function LoanSimulation({ profile, setProfile }: { profile: UserP
                     ) : (
                       <div className="bg-zinc-50 rounded-2xl py-4 px-5 border border-zinc-100 flex items-center justify-between">
                         <span className="font-bold text-lg text-zinc-900">
-                          R$ {parseCurrency(revenue).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          R$ {(profile?.monthlyRevenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                         {isInitialProcessing ? (
                           <div className="flex items-center space-x-2">
@@ -753,7 +755,7 @@ export default function LoanSimulation({ profile, setProfile }: { profile: UserP
                     </div>
                   )}
 
-                  {parseCurrency(revenue) > 0 && revenueStatus === 'approved' && (
+                  {profile && profile.monthlyRevenue > 0 && revenueStatus === 'approved' && (
                     <motion.div 
                       initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: 1, scale: 1 }}
@@ -761,7 +763,7 @@ export default function LoanSimulation({ profile, setProfile }: { profile: UserP
                     >
                       <p className="text-xs text-zinc-500 mb-1">Faturamento informado</p>
                       <p className="text-2xl font-bold text-zinc-900">
-                        R$ {parseCurrency(revenue).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        R$ {profile.monthlyRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                     </motion.div>
                   )}
@@ -969,7 +971,7 @@ export default function LoanSimulation({ profile, setProfile }: { profile: UserP
                 <div className="bg-emerald-50 p-6 rounded-2xl flex items-center justify-between border border-emerald-100">
                   <div className="space-y-1">
                     <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Faturamento Informado</p>
-                    <p className="font-bold text-emerald-900">R$ {parseFloat(revenue).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                    <p className="font-bold text-emerald-900">R$ {profile?.monthlyRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                   </div>
                   <div className="bg-emerald-500 text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase">Aprovado</div>
                 </div>
