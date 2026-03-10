@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Shield, CheckCircle2, X, Camera } from 'lucide-react';
+import { Shield, CheckCircle2, X, Camera, User, ArrowLeft, ArrowRight, Maximize, Minimize, Fingerprint } from 'lucide-react';
 import { doc, setDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { UserProfile } from '../types';
@@ -21,12 +21,12 @@ export default function FacialVerification({ profile, setProfile }: { profile: U
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
-  const instructions = [
-    "Centralize seu rosto",
-    "Afaste o rosto",
-    "Aproxime o rosto",
-    "Vire para a esquerda",
-    "Vire para a direita"
+  const instructionData = [
+    { text: "Centralize seu rosto", icon: <User size={24} /> },
+    { text: "Afaste o rosto", icon: <Maximize size={24} /> },
+    { text: "Aproxime o rosto", icon: <Minimize size={24} /> },
+    { text: "Vire para a esquerda", icon: <ArrowLeft size={24} /> },
+    { text: "Vire para a direita", icon: <ArrowRight size={24} /> }
   ];
 
   useEffect(() => {
@@ -35,7 +35,8 @@ export default function FacialVerification({ profile, setProfile }: { profile: U
       interval = setInterval(() => {
         setTimeLeft(prev => prev - 1);
         if ((40 - timeLeft) % 8 === 0) {
-          setInstruction(instructions[Math.floor((40 - timeLeft) / 8) % instructions.length]);
+          const idx = Math.floor((40 - timeLeft) / 8) % instructionData.length;
+          setInstruction(instructionData[idx].text);
         }
       }, 1000);
     } else if (timeLeft === 0 && recording) {
@@ -252,44 +253,50 @@ export default function FacialVerification({ profile, setProfile }: { profile: U
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -20, scale: 0.8 }}
                   transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                  className="bg-emerald-500 text-white px-8 py-4 rounded-2xl inline-block shadow-2xl shadow-emerald-500/40 border-2 border-white/20"
+                  className="bg-emerald-500 text-white px-8 py-4 rounded-2xl inline-flex items-center space-x-3 shadow-2xl shadow-emerald-500/40 border-2 border-white/20"
                 >
+                  <span className="animate-pulse">
+                    {instructionData.find(i => i.text === instruction)?.icon}
+                  </span>
                   <p className="font-black uppercase tracking-widest text-xl italic">{instruction}</p>
                 </motion.div>
               </AnimatePresence>
             </div>
 
-            <div className="relative w-80 h-80 flex items-center justify-center">
-              {/* Rotating outer ring */}
+            <div className="relative w-80 h-[400px] flex items-center justify-center">
+              {/* Rotating outer ring - Oval */}
               <motion.div 
-                className="absolute inset-0 border-2 border-dashed border-emerald-500/40 rounded-full"
-                animate={{ rotate: 360 }}
-                transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+                className="absolute inset-0 border-2 border-dashed border-emerald-500/40 rounded-[100%/120%]"
+                animate={{ rotate: 360, scale: [1, 1.02, 1] }}
+                transition={{ 
+                  rotate: { duration: 10, repeat: Infinity, ease: "linear" },
+                  scale: { duration: 4, repeat: Infinity, ease: "easeInOut" }
+                }}
               />
               
-              {/* Pulsing middle ring */}
+              {/* Pulsing middle ring - Oval */}
               <motion.div 
-                className="absolute inset-4 border-2 border-emerald-500/20 rounded-full"
-                animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.6, 0.3] }}
-                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute inset-x-4 inset-y-8 border-2 border-emerald-500/20 rounded-[100%/120%]"
+                animate={{ scale: [1, 1.05, 1], opacity: [0.3, 0.6, 0.3] }}
+                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
               />
 
               {/* Scanning line animation */}
               <motion.div 
-                className="absolute left-10 right-10 h-1 bg-emerald-400/60 z-20 blur-[2px] rounded-full"
-                animate={{ top: ['20%', '80%', '20%'] }}
-                transition={{ duration: 2.5, repeat: Infinity, ease: "linear" }}
+                className="absolute left-12 right-12 h-1 bg-emerald-400/80 z-20 blur-[1px] rounded-full shadow-[0_0_15px_rgba(52,211,153,0.8)]"
+                animate={{ top: ['15%', '85%', '15%'] }}
+                transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
               />
 
-              {/* Corner markers */}
+              {/* Corner markers - Oval style */}
               <div className="absolute inset-0 z-20 pointer-events-none">
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1 h-4 bg-emerald-500 rounded-full" />
-                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-4 bg-emerald-500 rounded-full" />
-                <div className="absolute left-0 top-1/2 -translate-y-1/2 h-1 w-4 bg-emerald-500 rounded-full" />
-                <div className="absolute right-0 top-1/2 -translate-y-1/2 h-1 w-4 bg-emerald-500 rounded-full" />
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 w-1 h-6 bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-1 h-6 bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 h-1 w-6 bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 h-1 w-6 bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
               </div>
 
-              <div className="relative w-64 h-64 overflow-hidden rounded-full border-4 border-emerald-500 shadow-[0_0_50px_rgba(16,185,129,0.3)] z-10">
+              <div className="relative w-64 h-80 overflow-hidden rounded-[100%/120%] border-4 border-emerald-500 shadow-[0_0_50px_rgba(16,185,129,0.3)] z-10">
                 <video 
                   ref={videoRef} 
                   autoPlay 
@@ -299,18 +306,21 @@ export default function FacialVerification({ profile, setProfile }: { profile: U
                 />
                 
                 {/* Overlay gradient for depth */}
-                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-emerald-500/5 to-transparent pointer-events-none" />
+                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-emerald-500/10 to-transparent pointer-events-none" />
+                
+                {/* Biometry grid overlay */}
+                <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle, #10b981 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
               </div>
             </div>
 
             <div className="text-center space-y-4">
               <motion.div
-                animate={{ opacity: [0.4, 1, 0.4] }}
-                transition={{ duration: 1.5, repeat: Infinity }}
-                className="flex items-center space-x-2 bg-zinc-800/50 px-4 py-2 rounded-full border border-zinc-700"
+                animate={{ opacity: [0.6, 1, 0.6], scale: [0.98, 1, 0.98] }}
+                transition={{ duration: 2, repeat: Infinity }}
+                className="flex items-center space-x-3 bg-zinc-800/80 px-6 py-3 rounded-full border border-emerald-500/30 backdrop-blur-sm shadow-xl"
               >
-                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                <p className="text-[10px] text-zinc-300 font-bold uppercase tracking-widest">Análise Biométrica em Tempo Real</p>
+                <Fingerprint size={16} className="text-emerald-500 animate-pulse" />
+                <p className="text-[10px] text-zinc-300 font-bold uppercase tracking-widest">Análise Biométrica Ativa</p>
               </motion.div>
             </div>
           </motion.div>
@@ -333,7 +343,7 @@ export default function FacialVerification({ profile, setProfile }: { profile: U
                     transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                   />
                 </div>
-                <p className="text-sm font-bold text-emerald-500 uppercase tracking-widest animate-pulse">Processando vídeo...</p>
+                <p className="text-sm font-bold text-emerald-500 uppercase tracking-widest animate-pulse">Analisando biometria...</p>
               </div>
             ) : (
               <>
