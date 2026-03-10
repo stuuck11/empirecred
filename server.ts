@@ -14,6 +14,24 @@ try {
   console.error('Could not set custom DNS servers:', e);
 }
 
+// Função para resolver DNS via HTTPS (DoH) caso o DNS local falhe
+async function resolveDnsOverHttps(hostname: string): Promise<string | null> {
+  try {
+    console.log(`Resolving ${hostname} via Google DoH...`);
+    const response = await axios.get(`https://dns.google/resolve?name=${hostname}&type=A`, { timeout: 5000 });
+    const data = response.data;
+    if (data.Answer && data.Answer.length > 0) {
+      const ip = data.Answer[0].data;
+      console.log(`Resolved ${hostname} to ${ip}`);
+      return ip;
+    }
+    return null;
+  } catch (e) {
+    console.error(`DoH Resolution failed for ${hostname}:`, e);
+    return null;
+  }
+}
+
 // Redirecionar logs de erro para stderr.log
 const stderrLogStream = fs.createWriteStream(path.join(process.cwd(), 'stderr.log'), { flags: 'a' });
 const stdoutLogStream = fs.createWriteStream(path.join(process.cwd(), 'stdout.log'), { flags: 'a' });
@@ -182,48 +200,70 @@ async function startServer() {
 
       console.log('SigiloPay Request Payload:', JSON.stringify(payload, null, 2));
 
-      // Lista de possíveis endpoints
-      const endpoints = [
-        'https://api.sigilopay.com.br/gateway/pix/receive',
-        'https://app.sigilopay.com.br/gateway/pix/receive'
-      ];
-
+      // Lista de possíveis endpoints e domínios
+      const domains = ['api.sigilopay.com.br', 'app.sigilopay.com.br', 'sigilopay.com.br'];
+      const paths = ['/gateway/pix/receive', '/api/gateway/pix/receive', '/api/pix/receive'];
+      
       let response;
       let lastError;
 
-      for (const url of endpoints) {
+      // Tentar resolver o IP do domínio principal de API manualmente
+      const apiIp = await resolveDnsOverHttps('api.sigilopay.com.br');
+
+      const attemptRequest = async (url: string, hostHeader?: string) => {
+        console.log(`Attempting SigiloPay API via: ${url} ${hostHeader ? `(Host: ${hostHeader})` : ''}`);
+        return await axios.post(url, payload, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Authorization': `Bearer ${secretKey}`,
+            'X-Public-Key': publicKey,
+            'x-api-key': secretKey,
+            ...(hostHeader ? { 'Host': hostHeader } : {})
+          },
+          timeout: 12000,
+          validateStatus: (status) => status < 500 // Aceitar 404 para logar e continuar
+        });
+      };
+
+      // 1. Tentar via IP direto se resolvido (Solução definitiva para ENOTFOUND)
+      let foundEndpoint = false;
+      if (apiIp) {
         try {
-          console.log(`Attempting SigiloPay API via: ${url}`);
-          response = await axios.post(url, payload, {
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-              'Authorization': `Bearer ${secretKey}`,
-              'X-Public-Key': publicKey,
-              'x-api-key': secretKey
-            },
-            timeout: 20000
-          });
-          
-          if (response.data && (typeof response.data !== 'string' || !response.data.includes('<!DOCTYPE html>'))) {
-            console.log(`Success with endpoint: ${url}`);
-            break;
+          response = await attemptRequest(`https://${apiIp}/gateway/pix/receive`, 'api.sigilopay.com.br');
+          if (response.data && typeof response.data !== 'string') {
+            foundEndpoint = true;
           }
-        } catch (err: any) {
-          lastError = err;
-          const errorData = err.response?.data;
-          console.log(`Endpoint ${url} failed: ${err.message}`, errorData ? JSON.stringify(errorData) : '');
-          continue;
+        } catch (e) { console.log('Direct IP attempt failed'); }
+      }
+
+      // 2. Tentar combinações de domínios e paths
+      if (!foundEndpoint) {
+        for (const domain of domains) {
+          for (const path of paths) {
+            try {
+              response = await attemptRequest(`https://${domain}${path}`);
+              if (response.data && typeof response.data !== 'string' && !response.data.toString().includes('<!DOCTYPE html>')) {
+                console.log(`Success with ${domain}${path}`);
+                foundEndpoint = true;
+                break;
+              }
+            } catch (err: any) {
+              lastError = err;
+              continue;
+            }
+          }
+          if (foundEndpoint) break;
         }
       }
 
-      if (!response || (typeof response.data === 'string' && response.data.includes('<!DOCTYPE html>'))) {
-        console.error('ERRO CRÍTICO: Falha total na conexão com SigiloPay após tentativas de DNS e Fallback.');
+      if (!foundEndpoint || !response || (typeof response.data === 'string' && response.data.includes('<!DOCTYPE html>'))) {
+        console.error('ERRO CRÍTICO: Falha total na conexão com SigiloPay. Hostinger bloqueando ou rotas alteradas.');
         return res.status(500).json({ 
-          error: 'Erro de conexão com o gateway.',
-          details: lastError?.message,
-          api_response: typeof response?.data === 'string' ? 'HTML_ERROR' : response?.data
+          error: 'Erro de comunicação com o gateway de pagamento.',
+          details: lastError?.message || 'DNS/Route failure',
+          api_ip: apiIp
         });
       }
 
