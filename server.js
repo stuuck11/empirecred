@@ -14,8 +14,12 @@ try {
 }
 async function resolveDnsOverHttps(hostname) {
   try {
-    console.log(`Resolving ${hostname} via Google DoH...`);
-    const response = await axios.get(`https://dns.google/resolve?name=${hostname}&type=A`, { timeout: 5e3 });
+    console.log(`Resolving ${hostname} via Google DoH (8.8.8.8)...`);
+    const response = await axios.get(`https://8.8.8.8/resolve?name=${hostname}&type=A`, {
+      timeout: 5e3,
+      httpsAgent: new https.Agent({ rejectUnauthorized: false })
+      // Google DoH via IP pode precisar disso
+    });
     const data = response.data;
     if (data.Answer && data.Answer.length > 0) {
       const ip = data.Answer[0].data;
@@ -24,7 +28,7 @@ async function resolveDnsOverHttps(hostname) {
     }
     return null;
   } catch (e) {
-    console.error(`DoH Resolution failed for ${hostname}:`, e);
+    console.log(`DoH Resolution failed for ${hostname}: ${e.message}`);
     return null;
   }
 }
@@ -171,62 +175,56 @@ async function startServer() {
         callbackurl: `${process.env.APP_URL || "https://empirecred.com"}/api/sigilopay/webhook`
       };
       console.log("SigiloPay Request Payload:", JSON.stringify(payload, null, 2));
-      const domains = ["api.sigilopay.com.br", "app.sigilopay.com.br", "sigilopay.com.br"];
-      const paths = ["/gateway/pix/receive", "/api/gateway/pix/receive", "/api/pix/receive"];
+      const apiIp = await resolveDnsOverHttps("api.sigilopay.com.br");
+      const targets = [
+        { url: "https://api.sigilopay.com.br/gateway/pix/receive", host: "api.sigilopay.com.br" },
+        { url: `https://${apiIp || "172.67.173.181"}/gateway/pix/receive`, host: "api.sigilopay.com.br" },
+        { url: "https://104.21.50.180/gateway/pix/receive", host: "api.sigilopay.com.br" },
+        { url: "https://app.sigilopay.com.br/api/gateway/pix/receive", host: "app.sigilopay.com.br" },
+        { url: "https://sigilopay.com.br/gateway/pix/receive", host: "sigilopay.com.br" }
+      ];
       let response;
       let lastError;
-      const apiIp = await resolveDnsOverHttps("api.sigilopay.com.br");
-      const attemptRequest = async (url, hostHeader) => {
-        console.log(`Attempting SigiloPay API via: ${url} ${hostHeader ? `(Host: ${hostHeader})` : ""}`);
-        return await axios.post(url, payload, {
-          headers: {
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Authorization": `Bearer ${secretKey}`,
-            "X-Public-Key": publicKey,
-            "x-api-key": secretKey,
-            ...hostHeader ? { "Host": hostHeader } : {}
-          },
-          timeout: 12e3,
-          validateStatus: (status) => status < 500
-          // Aceitar 404 para logar e continuar
-        });
-      };
       let foundEndpoint = false;
-      if (apiIp) {
+      for (const target of targets) {
+        if (target.url.includes("null")) continue;
         try {
-          response = await attemptRequest(`https://${apiIp}/gateway/pix/receive`, "api.sigilopay.com.br");
-          if (response.data && typeof response.data !== "string") {
+          console.log(`Attempting SigiloPay API via: ${target.url} (Host: ${target.host})`);
+          response = await axios.post(target.url, payload, {
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+              "Authorization": `Bearer ${secretKey}`,
+              "X-Public-Key": publicKey,
+              "x-api-key": secretKey,
+              "Host": target.host
+            },
+            timeout: 1e4,
+            httpsAgent: new https.Agent({ rejectUnauthorized: false }),
+            // Necessário para chamadas via IP
+            validateStatus: () => true
+            // Aceitar qualquer status para analisar
+          });
+          console.log(`Response from ${target.host}: Status ${response.status}, Type ${typeof response.data}`);
+          if (response.data && typeof response.data !== "string" && !response.data.toString().includes("<!DOCTYPE html>")) {
+            console.log(`SUCCESS with ${target.url}`);
             foundEndpoint = true;
+            break;
+          } else if (typeof response.data === "string") {
+            console.log(`Response start: ${response.data.substring(0, 100)}`);
           }
-        } catch (e) {
-          console.log("Direct IP attempt failed");
-        }
-      }
-      if (!foundEndpoint) {
-        for (const domain of domains) {
-          for (const path2 of paths) {
-            try {
-              response = await attemptRequest(`https://${domain}${path2}`);
-              if (response.data && typeof response.data !== "string" && !response.data.toString().includes("<!DOCTYPE html>")) {
-                console.log(`Success with ${domain}${path2}`);
-                foundEndpoint = true;
-                break;
-              }
-            } catch (err) {
-              lastError = err;
-              continue;
-            }
-          }
-          if (foundEndpoint) break;
+        } catch (err) {
+          lastError = err;
+          console.log(`Target ${target.url} failed: ${err.message}`);
+          continue;
         }
       }
       if (!foundEndpoint || !response || typeof response.data === "string" && response.data.includes("<!DOCTYPE html>")) {
-        console.error("ERRO CR\xCDTICO: Falha total na conex\xE3o com SigiloPay. Hostinger bloqueando ou rotas alteradas.");
+        console.error("ERRO CR\xCDTICO: Falha total na conex\xE3o com SigiloPay ap\xF3s todas as tentativas de IP/DNS.");
         return res.status(500).json({
-          error: "Erro de comunica\xE7\xE3o com o gateway de pagamento.",
-          details: lastError?.message || "DNS/Route failure",
+          error: "Erro de comunica\xE7\xE3o com o gateway.",
+          details: lastError?.message,
           api_ip: apiIp
         });
       }
