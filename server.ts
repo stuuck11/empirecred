@@ -3,6 +3,7 @@ import express from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import axios from 'axios';
 
 // Redirecionar logs de erro para stderr.log
 const stderrLogStream = fs.createWriteStream(path.join(process.cwd(), 'stderr.log'), { flags: 'a' });
@@ -137,36 +138,29 @@ async function startServer() {
         return res.status(500).json({ error: 'Configuração do SigiloPay incompleta no servidor.' });
       }
 
-      // Real API call to SigiloPay
-      const response = await fetch('https://api.sigilopay.com.br/v1/transaction', {
-        method: 'POST',
+      // Real API call to SigiloPay using axios for better stability in Node environments
+      const response = await axios.post('https://api.sigilopay.com.br/v1/transaction', {
+        amount: Math.round(amount * 100), // convert to cents
+        payment_method: method === 'pix' ? 'pix' : 'boleto',
+        description: description,
+        return_url: `${process.env.APP_URL || 'https://empirecred.com'}/dashboard`,
+        notification_url: `${process.env.APP_URL || 'https://empirecred.com'}/api/sigilopay/webhook`,
+        customer: {
+          name: 'Cliente EmpireCred',
+          email: 'cliente@empirecred.com',
+          document: '00000000000'
+        }
+      }, {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${secretKey}`,
           'X-Public-Key': publicKey
         },
-        body: JSON.stringify({
-          amount: Math.round(amount * 100), // convert to cents
-          payment_method: method === 'pix' ? 'pix' : 'boleto',
-          description: description,
-          return_url: `${process.env.APP_URL || 'https://empirecred.com'}/dashboard`,
-          notification_url: `${process.env.APP_URL || 'https://empirecred.com'}/api/sigilopay/webhook`,
-          // Adicionando campos comuns exigidos por gateways
-          customer: {
-            name: 'Cliente EmpireCred',
-            email: 'cliente@empirecred.com',
-            document: '00000000000' // CPF genérico se não fornecido
-          }
-        })
+        timeout: 30000 // 30 seconds timeout
       });
 
-      const data = await response.json();
+      const data = response.data;
       console.log('SigiloPay API Response:', JSON.stringify(data, null, 2));
-
-      if (!response.ok) {
-        console.error('SigiloPay API Error Response:', data);
-        throw new Error(data.message || 'Erro na API do SigiloPay');
-      }
 
       // Mapeamento de campos baseado no retorno comum da SigiloPay
       const resultData = data.data || data;
@@ -182,9 +176,13 @@ async function startServer() {
       });
 
     } catch (error: any) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error('SigiloPay Proxy Error:', error);
-      res.status(500).json({ error: errorMessage || 'Erro ao processar pagamento com SigiloPay' });
+      const errorMessage = error.response?.data?.message || error.message || 'Erro ao processar pagamento com SigiloPay';
+      const errorDetails = error.response?.data || error.message;
+      console.error('SigiloPay Proxy Error:', errorDetails);
+      res.status(error.response?.status || 500).json({ 
+        error: errorMessage,
+        details: errorDetails
+      });
     }
   });
 

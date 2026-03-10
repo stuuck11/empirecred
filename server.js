@@ -1,8 +1,24 @@
 // server.ts
+import "dotenv/config";
 import express from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import axios from "axios";
+var stderrLogStream = fs.createWriteStream(path.join(process.cwd(), "stderr.log"), { flags: "a" });
+var originalConsoleError = console.error;
+console.error = (...args) => {
+  const message = args.map((arg) => {
+    if (arg instanceof Error) {
+      return `${arg.name}: ${arg.message}
+${arg.stack}`;
+    }
+    return typeof arg === "object" ? JSON.stringify(arg, null, 2) : arg;
+  }).join(" ");
+  stderrLogStream.write(`[${(/* @__PURE__ */ new Date()).toISOString()}] ${message}
+`);
+  originalConsoleError.apply(console, args);
+};
 async function startServer() {
   const app = express();
   const PORT = 3e3;
@@ -15,7 +31,7 @@ async function startServer() {
       cb(null, uploadDir);
     },
     filename: (req, file, cb) => {
-      if (req.body.cpf && (file.fieldname === "video" || file.fieldname === "front" || file.fieldname === "back")) {
+      if (req.body.cpf && (file.fieldname === "video" || file.fieldname === "front" || file.fieldname === "back" || file.fieldname === "proof")) {
         const cpf = req.body.cpf.replace(/\D/g, "");
         const prefix = file.fieldname;
         cb(null, `${prefix}-${cpf}${path.extname(file.originalname) || (file.fieldname === "video" ? ".mp4" : ".jpg")}`);
@@ -85,6 +101,61 @@ async function startServer() {
     } catch (error) {
       console.error("Erro no upload do comprovante:", error);
       res.status(500).json({ error: "Erro interno no servidor ao processar upload do comprovante." });
+    }
+  });
+  app.post("/api/sigilopay/payment", async (req, res) => {
+    try {
+      const { amount, method, description } = req.body;
+      const secretKey = process.env.SIGILOPAY_SECRET_KEY;
+      const publicKey = process.env.SIGILOPAY_PUBLIC_KEY;
+      if (!secretKey || !publicKey) {
+        console.error("SigiloPay credentials missing in environment. Keys found:", {
+          hasSecret: !!secretKey,
+          hasPublic: !!publicKey
+        });
+        return res.status(500).json({ error: "Configura\xE7\xE3o do SigiloPay incompleta no servidor." });
+      }
+      const response = await axios.post("https://api.sigilopay.com.br/v1/transaction", {
+        amount: Math.round(amount * 100),
+        // convert to cents
+        payment_method: method === "pix" ? "pix" : "boleto",
+        description,
+        return_url: `${process.env.APP_URL || "https://empirecred.com"}/dashboard`,
+        notification_url: `${process.env.APP_URL || "https://empirecred.com"}/api/sigilopay/webhook`,
+        customer: {
+          name: "Cliente EmpireCred",
+          email: "cliente@empirecred.com",
+          document: "00000000000"
+        }
+      }, {
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${secretKey}`,
+          "X-Public-Key": publicKey
+        },
+        timeout: 3e4
+        // 30 seconds timeout
+      });
+      const data = response.data;
+      console.log("SigiloPay API Response:", JSON.stringify(data, null, 2));
+      const resultData = data.data || data;
+      const pixCode = resultData.pix_code || resultData.copy_paste || resultData.pix_copy_paste || resultData.pix_payload || resultData.payload;
+      const pixQrCode = resultData.pix_qr_code || resultData.qr_code_url || resultData.pix_qr_code_url || resultData.qr_code || (pixCode ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(pixCode)}` : null);
+      res.json({
+        success: true,
+        pixCode,
+        pixQrCode,
+        barcode: resultData.barcode || resultData.line || resultData.digitable_line || resultData.boleto_line || resultData.linha_digitavel,
+        paymentLink: resultData.payment_url || resultData.pdf_url || resultData.boleto_url || resultData.url || resultData.checkout_url
+      });
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || error.message || "Erro ao processar pagamento com SigiloPay";
+      const errorDetails = error.response?.data || error.message;
+      console.error("SigiloPay Proxy Error:", errorDetails);
+      res.status(error.response?.status || 500).json({
+        error: errorMessage,
+        details: errorDetails
+      });
     }
   });
   app.all("/api/*", (req, res) => {
