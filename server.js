@@ -17,8 +17,10 @@ ${arg.stack}`;
     }
     return typeof arg === "object" ? JSON.stringify(arg, null, 2) : arg;
   }).join(" ");
-  stderrLogStream.write(`[${(/* @__PURE__ */ new Date()).toISOString()}] ERROR: ${message}
-`);
+  const logLine = `[${(/* @__PURE__ */ new Date()).toISOString()}] ERROR: ${message}
+`;
+  stderrLogStream.write(logLine);
+  stdoutLogStream.write(logLine);
   originalConsoleError.apply(console, args);
 };
 console.log = (...args) => {
@@ -143,18 +145,37 @@ async function startServer() {
         ],
         dueDate: new Date(Date.now() + 864e5).toISOString().split("T")[0],
         // tomorrow
-        callbackUrl: `${process.env.APP_URL || "https://empirecred.com"}/api/sigilopay/webhook`
+        callbackurl: `${process.env.APP_URL || "https://empirecred.com"}/api/sigilopay/webhook`
       };
       console.log("SigiloPay Request Payload:", JSON.stringify(payload, null, 2));
-      const response = await axios.post("https://api.sigilopay.com.br/gateway/pix/receive", payload, {
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${secretKey}`,
-          "X-Public-Key": publicKey,
-          "x-api-key": secretKey
-        },
-        timeout: 3e4
-      });
+      let response;
+      try {
+        console.log("Attempting SigiloPay API via api. subdomain...");
+        response = await axios.post("https://api.sigilopay.com.br/gateway/pix/receive", payload, {
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${secretKey}`,
+            "X-Public-Key": publicKey,
+            "x-api-key": secretKey
+          },
+          timeout: 15e3
+        });
+      } catch (dnsError) {
+        if (dnsError.code === "ENOTFOUND" || dnsError.code === "ECONNREFUSED") {
+          console.log("Subdomain api. failed (DNS/Connection). Trying fallback to app. subdomain...");
+          response = await axios.post("https://app.sigilopay.com.br/gateway/pix/receive", payload, {
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${secretKey}`,
+              "X-Public-Key": publicKey,
+              "x-api-key": secretKey
+            },
+            timeout: 15e3
+          });
+        } else {
+          throw dnsError;
+        }
+      }
       const data = response.data;
       console.log("SigiloPay API Response Status:", response.status);
       if (typeof data === "string" && data.includes("<!DOCTYPE html>")) {
