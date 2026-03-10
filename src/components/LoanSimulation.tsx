@@ -402,6 +402,12 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
     const rev = parseCurrency(revenue);
     const req = parseFloat(requestedAmount);
     
+    if (req < 500) {
+      setError('O valor mínimo para empréstimo é de R$ 500,00.');
+      return;
+    }
+    
+    setError('');
     setAnalyzing(true);
     setTimeout(() => {
       setAnalyzing(false);
