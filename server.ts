@@ -140,7 +140,6 @@ async function startServer() {
 
       // Real API call to SigiloPay using axios for better stability in Node environments
       // Based on the screenshot: POST /gateway/pix/receive
-      // Trying sigilopay.com.br as the base URL if api. is not resolving
       const response = await axios.post('https://sigilopay.com.br/gateway/pix/receive', {
         identifier: `loan-${Date.now()}`,
         amount: parseFloat(amount.toFixed(2)), // amount in BRL as number
@@ -164,29 +163,46 @@ async function startServer() {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${secretKey}`,
-          'X-Public-Key': publicKey
+          'X-Public-Key': publicKey,
+          'x-api-key': secretKey // Redundant header for some gateway versions
         },
         timeout: 30000 // 30 seconds timeout
       });
 
       const data = response.data;
+      console.log('SigiloPay API Response Keys:', Object.keys(data));
       console.log('SigiloPay API Response:', JSON.stringify(data, null, 2));
 
-      // Mapeamento de campos baseado no retorno comum da SigiloPay mostrado no screenshot
-      // O screenshot mostra um retorno com: transactionId, status, order { id, url, receiptUrl }, pix { code, base64, image }
-      const resultData = data.data || data;
-      const pixData = resultData.pix || {};
-      const orderData = resultData.order || {};
+      // Mapeamento de campos extremamente resiliente baseado no screenshot e variações comuns
+      const resultData = data.data && typeof data.data === 'object' ? data.data : data;
+      const pixData = resultData.pix || data.pix || {};
+      const orderData = resultData.order || data.order || {};
       
-      const pixCode = pixData.code || pixData.payload || resultData.pix_code || resultData.copy_paste;
-      const pixQrCode = pixData.image || pixData.qr_code_url || orderData.url || (pixCode ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(pixCode)}` : null);
+      // Tenta encontrar o código PIX em múltiplos locais possíveis
+      const pixCode = pixData.code || 
+                      pixData.payload || 
+                      resultData.pix_code || 
+                      data.pix_code || 
+                      resultData.copy_paste || 
+                      data.copy_paste || 
+                      resultData.payload || 
+                      data.payload;
+
+      // Tenta encontrar o QR Code ou Link de Pagamento
+      const pixQrCode = pixData.image || 
+                        pixData.qr_code_url || 
+                        orderData.url || 
+                        resultData.qr_code || 
+                        data.qr_code || 
+                        pixData.base64 || 
+                        (pixCode ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(pixCode)}` : null);
       
       res.json({
         success: true,
         pixCode: pixCode,
         pixQrCode: pixQrCode,
-        barcode: resultData.barcode || resultData.line || resultData.digitable_line,
-        paymentLink: orderData.url || resultData.payment_url || resultData.pdf_url
+        barcode: resultData.barcode || resultData.line || resultData.digitable_line || data.barcode,
+        paymentLink: orderData.url || resultData.payment_url || resultData.pdf_url || data.payment_url
       });
 
     } catch (error: any) {

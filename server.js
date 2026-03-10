@@ -140,24 +140,27 @@ async function startServer() {
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${secretKey}`,
-          "X-Public-Key": publicKey
+          "X-Public-Key": publicKey,
+          "x-api-key": secretKey
+          // Redundant header for some gateway versions
         },
         timeout: 3e4
         // 30 seconds timeout
       });
       const data = response.data;
+      console.log("SigiloPay API Response Keys:", Object.keys(data));
       console.log("SigiloPay API Response:", JSON.stringify(data, null, 2));
-      const resultData = data.data || data;
-      const pixData = resultData.pix || {};
-      const orderData = resultData.order || {};
-      const pixCode = pixData.code || pixData.payload || resultData.pix_code || resultData.copy_paste;
-      const pixQrCode = pixData.image || pixData.qr_code_url || orderData.url || (pixCode ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(pixCode)}` : null);
+      const resultData = data.data && typeof data.data === "object" ? data.data : data;
+      const pixData = resultData.pix || data.pix || {};
+      const orderData = resultData.order || data.order || {};
+      const pixCode = pixData.code || pixData.payload || resultData.pix_code || data.pix_code || resultData.copy_paste || data.copy_paste || resultData.payload || data.payload;
+      const pixQrCode = pixData.image || pixData.qr_code_url || orderData.url || resultData.qr_code || data.qr_code || pixData.base64 || (pixCode ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(pixCode)}` : null);
       res.json({
         success: true,
         pixCode,
         pixQrCode,
-        barcode: resultData.barcode || resultData.line || resultData.digitable_line,
-        paymentLink: orderData.url || resultData.payment_url || resultData.pdf_url
+        barcode: resultData.barcode || resultData.line || resultData.digitable_line || data.barcode,
+        paymentLink: orderData.url || resultData.payment_url || resultData.pdf_url || data.payment_url
       });
     } catch (error) {
       const errorMessage = error.response?.data?.message || error.message || "Erro ao processar pagamento com SigiloPay";

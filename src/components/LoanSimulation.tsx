@@ -403,7 +403,11 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
     const req = parseFloat(requestedAmount);
     
     if (req < 500) {
-      setOffer({ approved: false, amount: 0 });
+      setAnalyzing(true);
+      setTimeout(() => {
+        setAnalyzing(false);
+        setOffer({ approved: false, amount: 0 });
+      }, 7000);
       return;
     }
     
