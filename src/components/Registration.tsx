@@ -122,6 +122,7 @@ export default function Registration({ onRegister }: { onRegister: (u: any, p: U
             console.log("Uploading documents to backend...");
             if (files.front && files.back) {
               const formDataUpload = new FormData();
+              formDataUpload.append('cpf', formData.cpf); // Envia o CPF para o nome do arquivo
               formDataUpload.append('front', files.front);
               formDataUpload.append('back', files.back);
 
