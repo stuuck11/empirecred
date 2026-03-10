@@ -5,6 +5,13 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import axios from "axios";
+import dns from "dns";
+try {
+  dns.setServers(["8.8.8.8", "1.1.1.1", "8.8.4.4"]);
+  console.log("DNS servers set to Google/Cloudflare");
+} catch (e) {
+  console.error("Could not set custom DNS servers:", e);
+}
 var stderrLogStream = fs.createWriteStream(path.join(process.cwd(), "stderr.log"), { flags: "a" });
 var stdoutLogStream = fs.createWriteStream(path.join(process.cwd(), "stdout.log"), { flags: "a" });
 var originalConsoleError = console.error;
@@ -127,8 +134,8 @@ async function startServer() {
       }
       const payload = {
         identifier: `loan-${Date.now()}`,
-        amount: amount.toFixed(2),
-        // Enviar como string "XX.XX" para evitar problemas de precisão/tipo
+        amount: parseFloat(amount.toFixed(2)),
+        // Valor como número com 2 casas
         client: {
           name: "Cliente EmpireCred",
           email: "cliente@empirecred.com",
@@ -140,7 +147,7 @@ async function startServer() {
             id: "loan_fee",
             name: description || "Taxa de Empr\xE9stimo",
             quantity: 1,
-            price: amount.toFixed(2)
+            price: parseFloat(amount.toFixed(2))
           }
         ],
         dueDate: new Date(Date.now() + 864e5).toISOString().split("T")[0],
@@ -149,9 +156,8 @@ async function startServer() {
       };
       console.log("SigiloPay Request Payload:", JSON.stringify(payload, null, 2));
       const endpoints = [
-        "https://app.sigilopay.com.br/api/gateway/pix/receive",
         "https://api.sigilopay.com.br/gateway/pix/receive",
-        "https://sigilopay.com.br/api/gateway/pix/receive"
+        "https://app.sigilopay.com.br/gateway/pix/receive"
       ];
       let response;
       let lastError;
@@ -161,30 +167,32 @@ async function startServer() {
           response = await axios.post(url, payload, {
             headers: {
               "Content-Type": "application/json",
+              "Accept": "application/json",
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
               "Authorization": `Bearer ${secretKey}`,
               "X-Public-Key": publicKey,
               "x-api-key": secretKey
             },
-            timeout: 1e4
+            timeout: 2e4
           });
           if (response.data && (typeof response.data !== "string" || !response.data.includes("<!DOCTYPE html>"))) {
             console.log(`Success with endpoint: ${url}`);
             break;
-          } else {
-            console.log(`Endpoint ${url} returned HTML/Invalid data. Trying next...`);
           }
         } catch (err) {
           lastError = err;
-          console.log(`Endpoint ${url} failed: ${err.message}`);
+          const errorData = err.response?.data;
+          console.log(`Endpoint ${url} failed: ${err.message}`, errorData ? JSON.stringify(errorData) : "");
           continue;
         }
       }
       if (!response || typeof response.data === "string" && response.data.includes("<!DOCTYPE html>")) {
-        console.error("ERRO CR\xCDTICO: Nenhum endpoint da SigiloPay retornou JSON v\xE1lido.", {
-          lastError: lastError?.message,
-          status: response?.status
+        console.error("ERRO CR\xCDTICO: Falha total na conex\xE3o com SigiloPay ap\xF3s tentativas de DNS e Fallback.");
+        return res.status(500).json({
+          error: "Erro de conex\xE3o com o gateway.",
+          details: lastError?.message,
+          api_response: typeof response?.data === "string" ? "HTML_ERROR" : response?.data
         });
-        return res.status(500).json({ error: "N\xE3o foi poss\xEDvel conectar ao gateway de pagamento. Verifique os logs." });
       }
       const data = response.data;
       console.log("SigiloPay API Response:", JSON.stringify(data, null, 2));
