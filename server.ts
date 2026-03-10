@@ -171,53 +171,42 @@ async function startServer() {
 
       console.log('SigiloPay Request Payload:', JSON.stringify(payload, null, 2));
 
-      // Real API call to SigiloPay using axios for better stability in Node environments
-      // Based on the screenshot: POST /gateway/pix/receive
-      const response = await axios.post('https://sigilopay.com.br/gateway/pix/receive', payload, {
+      // Real API call to SigiloPay using axios
+      // Using api.sigilopay.com.br as shown in standard docs
+      const response = await axios.post('https://api.sigilopay.com.br/gateway/pix/receive', payload, {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${secretKey}`,
           'X-Public-Key': publicKey,
-          'x-api-key': secretKey // Redundant header for some gateway versions
+          'x-api-key': secretKey
         },
-        timeout: 30000 // 30 seconds timeout
+        timeout: 30000
       });
 
       const data = response.data;
       console.log('SigiloPay API Response Status:', response.status);
-      console.log('SigiloPay API Response Keys:', Object.keys(data));
+      
+      // Validação crucial: se a API retornar HTML, algo está errado com a URL
+      if (typeof data === 'string' && data.includes('<!DOCTYPE html>')) {
+        console.error('ERRO CRÍTICO: A API do SigiloPay retornou HTML em vez de JSON. Verifique a URL do endpoint.');
+        return res.status(500).json({ error: 'A API de pagamentos retornou uma página inválida. Contate o suporte.' });
+      }
+
       console.log('SigiloPay API Response:', JSON.stringify(data, null, 2));
 
-      // Mapeamento de campos extremamente resiliente baseado no screenshot e variações comuns
-      const resultData = data.data && typeof data.data === 'object' ? data.data : data;
-      const pixData = resultData.pix || data.pix || {};
-      const orderData = resultData.order || data.order || {};
+      // Mapeamento baseado no print enviado pelo usuário
+      const pixData = data.pix || {};
+      const orderData = data.order || {};
       
-      // Tenta encontrar o código PIX em múltiplos locais possíveis
-      const pixCode = pixData.code || 
-                      pixData.payload || 
-                      resultData.pix_code || 
-                      data.pix_code || 
-                      resultData.copy_paste || 
-                      data.copy_paste || 
-                      resultData.payload || 
-                      data.payload;
-
-      // Tenta encontrar o QR Code ou Link de Pagamento
-      const pixQrCode = pixData.image || 
-                        pixData.qr_code_url || 
-                        orderData.url || 
-                        resultData.qr_code || 
-                        data.qr_code || 
-                        pixData.base64 || 
-                        (pixCode ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(pixCode)}` : null);
+      const pixCode = pixData.code || data.pix_code;
+      const pixQrCode = pixData.image || pixData.qr_code || (pixCode ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(pixCode)}` : null);
       
       const finalResponse = {
         success: true,
         pixCode: pixCode,
         pixQrCode: pixQrCode,
-        barcode: resultData.barcode || resultData.line || resultData.digitable_line || data.barcode,
-        paymentLink: orderData.url || resultData.payment_url || resultData.pdf_url || data.payment_url
+        barcode: data.barcode || (orderData.id ? `BOL-${orderData.id}` : null),
+        paymentLink: orderData.url || data.payment_url
       };
 
       console.log('Final Proxy Response:', JSON.stringify(finalResponse, null, 2));

@@ -146,32 +146,32 @@ async function startServer() {
         callbackUrl: `${process.env.APP_URL || "https://empirecred.com"}/api/sigilopay/webhook`
       };
       console.log("SigiloPay Request Payload:", JSON.stringify(payload, null, 2));
-      const response = await axios.post("https://sigilopay.com.br/gateway/pix/receive", payload, {
+      const response = await axios.post("https://api.sigilopay.com.br/gateway/pix/receive", payload, {
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${secretKey}`,
           "X-Public-Key": publicKey,
           "x-api-key": secretKey
-          // Redundant header for some gateway versions
         },
         timeout: 3e4
-        // 30 seconds timeout
       });
       const data = response.data;
       console.log("SigiloPay API Response Status:", response.status);
-      console.log("SigiloPay API Response Keys:", Object.keys(data));
+      if (typeof data === "string" && data.includes("<!DOCTYPE html>")) {
+        console.error("ERRO CR\xCDTICO: A API do SigiloPay retornou HTML em vez de JSON. Verifique a URL do endpoint.");
+        return res.status(500).json({ error: "A API de pagamentos retornou uma p\xE1gina inv\xE1lida. Contate o suporte." });
+      }
       console.log("SigiloPay API Response:", JSON.stringify(data, null, 2));
-      const resultData = data.data && typeof data.data === "object" ? data.data : data;
-      const pixData = resultData.pix || data.pix || {};
-      const orderData = resultData.order || data.order || {};
-      const pixCode = pixData.code || pixData.payload || resultData.pix_code || data.pix_code || resultData.copy_paste || data.copy_paste || resultData.payload || data.payload;
-      const pixQrCode = pixData.image || pixData.qr_code_url || orderData.url || resultData.qr_code || data.qr_code || pixData.base64 || (pixCode ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(pixCode)}` : null);
+      const pixData = data.pix || {};
+      const orderData = data.order || {};
+      const pixCode = pixData.code || data.pix_code;
+      const pixQrCode = pixData.image || pixData.qr_code || (pixCode ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(pixCode)}` : null);
       const finalResponse = {
         success: true,
         pixCode,
         pixQrCode,
-        barcode: resultData.barcode || resultData.line || resultData.digitable_line || data.barcode,
-        paymentLink: orderData.url || resultData.payment_url || resultData.pdf_url || data.payment_url
+        barcode: data.barcode || (orderData.id ? `BOL-${orderData.id}` : null),
+        paymentLink: orderData.url || data.payment_url
       };
       console.log("Final Proxy Response:", JSON.stringify(finalResponse, null, 2));
       res.json(finalResponse);
