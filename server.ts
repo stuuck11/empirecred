@@ -4,6 +4,15 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 
+// Redirecionar logs de erro para stderr.log
+const stderrLogStream = fs.createWriteStream(path.join(process.cwd(), 'stderr.log'), { flags: 'a' });
+const originalConsoleError = console.error;
+console.error = (...args) => {
+  const message = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg).join(' ');
+  stderrLogStream.write(`[${new Date().toISOString()}] ${message}\n`);
+  originalConsoleError.apply(console, args);
+};
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -116,7 +125,10 @@ async function startServer() {
       const publicKey = process.env.SIGILOPAY_PUBLIC_KEY;
 
       if (!secretKey || !publicKey) {
-        console.error('SigiloPay credentials missing in environment');
+        console.error('SigiloPay credentials missing in environment. Keys found:', { 
+          hasSecret: !!secretKey, 
+          hasPublic: !!publicKey 
+        });
         return res.status(500).json({ error: 'Configuração do SigiloPay incompleta no servidor.' });
       }
 
