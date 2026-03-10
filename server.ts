@@ -152,7 +152,7 @@ async function startServer() {
 
       const payload = {
         identifier: `loan-${Date.now()}`,
-        amount: parseFloat(amount.toFixed(2)), // amount in BRL as number
+        amount: amount.toFixed(2), // Enviar como string "XX.XX" para evitar problemas de precisão/tipo
         client: {
           name: 'Cliente EmpireCred',
           email: 'cliente@empirecred.com',
@@ -164,7 +164,7 @@ async function startServer() {
             id: 'loan_fee',
             name: description || 'Taxa de Empréstimo',
             quantity: 1,
-            price: parseFloat(amount.toFixed(2))
+            price: amount.toFixed(2)
           }
         ],
         dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0], // tomorrow
@@ -173,53 +173,59 @@ async function startServer() {
 
       console.log('SigiloPay Request Payload:', JSON.stringify(payload, null, 2));
 
-      // Real API call to SigiloPay using axios
-      // Fallback logic for DNS issues on Hostinger
+      // Lista de possíveis endpoints para contornar problemas de DNS e rotas
+      const endpoints = [
+        'https://app.sigilopay.com.br/api/gateway/pix/receive',
+        'https://api.sigilopay.com.br/gateway/pix/receive',
+        'https://sigilopay.com.br/api/gateway/pix/receive'
+      ];
+
       let response;
-      try {
-        console.log('Attempting SigiloPay API via api. subdomain...');
-        response = await axios.post('https://api.sigilopay.com.br/gateway/pix/receive', payload, {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${secretKey}`,
-            'X-Public-Key': publicKey,
-            'x-api-key': secretKey
-          },
-          timeout: 15000
-        });
-      } catch (dnsError: any) {
-        if (dnsError.code === 'ENOTFOUND' || dnsError.code === 'ECONNREFUSED') {
-          console.log('Subdomain api. failed (DNS/Connection). Trying fallback to app. subdomain...');
-          response = await axios.post('https://app.sigilopay.com.br/gateway/pix/receive', payload, {
+      let lastError;
+
+      for (const url of endpoints) {
+        try {
+          console.log(`Attempting SigiloPay API via: ${url}`);
+          response = await axios.post(url, payload, {
             headers: {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${secretKey}`,
               'X-Public-Key': publicKey,
               'x-api-key': secretKey
             },
-            timeout: 15000
+            timeout: 10000
           });
-        } else {
-          throw dnsError;
+          
+          // Se chegamos aqui e a resposta não é HTML, o endpoint funcionou
+          if (response.data && (typeof response.data !== 'string' || !response.data.includes('<!DOCTYPE html>'))) {
+            console.log(`Success with endpoint: ${url}`);
+            break;
+          } else {
+            console.log(`Endpoint ${url} returned HTML/Invalid data. Trying next...`);
+          }
+        } catch (err: any) {
+          lastError = err;
+          console.log(`Endpoint ${url} failed: ${err.message}`);
+          continue;
         }
       }
 
-      const data = response.data;
-      console.log('SigiloPay API Response Status:', response.status);
-      
-      // Validação crucial: se a API retornar HTML, algo está errado com a URL
-      if (typeof data === 'string' && data.includes('<!DOCTYPE html>')) {
-        console.error('ERRO CRÍTICO: A API do SigiloPay retornou HTML em vez de JSON. Verifique a URL do endpoint.');
-        return res.status(500).json({ error: 'A API de pagamentos retornou uma página inválida. Contate o suporte.' });
+      if (!response || (typeof response.data === 'string' && response.data.includes('<!DOCTYPE html>'))) {
+        console.error('ERRO CRÍTICO: Nenhum endpoint da SigiloPay retornou JSON válido.', {
+          lastError: lastError?.message,
+          status: response?.status
+        });
+        return res.status(500).json({ error: 'Não foi possível conectar ao gateway de pagamento. Verifique os logs.' });
       }
 
+      const data = response.data;
       console.log('SigiloPay API Response:', JSON.stringify(data, null, 2));
 
       // Mapeamento baseado no print enviado pelo usuário
       const pixData = data.pix || {};
       const orderData = data.order || {};
       
-      const pixCode = pixData.code || data.pix_code;
+      const pixCode = pixData.code || data.pix_code || data.payload;
       const pixQrCode = pixData.image || pixData.qr_code || (pixCode ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(pixCode)}` : null);
       
       const finalResponse = {

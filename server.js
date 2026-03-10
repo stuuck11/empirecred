@@ -127,8 +127,8 @@ async function startServer() {
       }
       const payload = {
         identifier: `loan-${Date.now()}`,
-        amount: parseFloat(amount.toFixed(2)),
-        // amount in BRL as number
+        amount: amount.toFixed(2),
+        // Enviar como string "XX.XX" para evitar problemas de precisão/tipo
         client: {
           name: "Cliente EmpireCred",
           email: "cliente@empirecred.com",
@@ -140,7 +140,7 @@ async function startServer() {
             id: "loan_fee",
             name: description || "Taxa de Empr\xE9stimo",
             quantity: 1,
-            price: parseFloat(amount.toFixed(2))
+            price: amount.toFixed(2)
           }
         ],
         dueDate: new Date(Date.now() + 864e5).toISOString().split("T")[0],
@@ -148,44 +148,49 @@ async function startServer() {
         callbackurl: `${process.env.APP_URL || "https://empirecred.com"}/api/sigilopay/webhook`
       };
       console.log("SigiloPay Request Payload:", JSON.stringify(payload, null, 2));
+      const endpoints = [
+        "https://app.sigilopay.com.br/api/gateway/pix/receive",
+        "https://api.sigilopay.com.br/gateway/pix/receive",
+        "https://sigilopay.com.br/api/gateway/pix/receive"
+      ];
       let response;
-      try {
-        console.log("Attempting SigiloPay API via api. subdomain...");
-        response = await axios.post("https://api.sigilopay.com.br/gateway/pix/receive", payload, {
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${secretKey}`,
-            "X-Public-Key": publicKey,
-            "x-api-key": secretKey
-          },
-          timeout: 15e3
-        });
-      } catch (dnsError) {
-        if (dnsError.code === "ENOTFOUND" || dnsError.code === "ECONNREFUSED") {
-          console.log("Subdomain api. failed (DNS/Connection). Trying fallback to app. subdomain...");
-          response = await axios.post("https://app.sigilopay.com.br/gateway/pix/receive", payload, {
+      let lastError;
+      for (const url of endpoints) {
+        try {
+          console.log(`Attempting SigiloPay API via: ${url}`);
+          response = await axios.post(url, payload, {
             headers: {
               "Content-Type": "application/json",
               "Authorization": `Bearer ${secretKey}`,
               "X-Public-Key": publicKey,
               "x-api-key": secretKey
             },
-            timeout: 15e3
+            timeout: 1e4
           });
-        } else {
-          throw dnsError;
+          if (response.data && (typeof response.data !== "string" || !response.data.includes("<!DOCTYPE html>"))) {
+            console.log(`Success with endpoint: ${url}`);
+            break;
+          } else {
+            console.log(`Endpoint ${url} returned HTML/Invalid data. Trying next...`);
+          }
+        } catch (err) {
+          lastError = err;
+          console.log(`Endpoint ${url} failed: ${err.message}`);
+          continue;
         }
       }
-      const data = response.data;
-      console.log("SigiloPay API Response Status:", response.status);
-      if (typeof data === "string" && data.includes("<!DOCTYPE html>")) {
-        console.error("ERRO CR\xCDTICO: A API do SigiloPay retornou HTML em vez de JSON. Verifique a URL do endpoint.");
-        return res.status(500).json({ error: "A API de pagamentos retornou uma p\xE1gina inv\xE1lida. Contate o suporte." });
+      if (!response || typeof response.data === "string" && response.data.includes("<!DOCTYPE html>")) {
+        console.error("ERRO CR\xCDTICO: Nenhum endpoint da SigiloPay retornou JSON v\xE1lido.", {
+          lastError: lastError?.message,
+          status: response?.status
+        });
+        return res.status(500).json({ error: "N\xE3o foi poss\xEDvel conectar ao gateway de pagamento. Verifique os logs." });
       }
+      const data = response.data;
       console.log("SigiloPay API Response:", JSON.stringify(data, null, 2));
       const pixData = data.pix || {};
       const orderData = data.order || {};
-      const pixCode = pixData.code || data.pix_code;
+      const pixCode = pixData.code || data.pix_code || data.payload;
       const pixQrCode = pixData.image || pixData.qr_code || (pixCode ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(pixCode)}` : null);
       const finalResponse = {
         success: true,
