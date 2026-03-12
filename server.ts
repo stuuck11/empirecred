@@ -201,19 +201,10 @@ async function startServer() {
           phone: '11999999999',
           document: '000.000.000-00'
         },
-        products: [
-          {
-            id: 'loan_fee',
-            name: description || 'Taxa de Antecipação de Empréstimo',
-            quantity: 1,
-            price: Number(amount.toFixed(2))
-          }
-        ],
         metadata: {
           origin: 'EmpireCred App',
           internalId: `loan-${Date.now()}`
         },
-        dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0], // tomorrow
         callbackurl: `${process.env.APP_URL || 'https://empirecred.com'}/api/webhooks/sigilopay`
       };
 
