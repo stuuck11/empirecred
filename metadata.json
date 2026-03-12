@@ -1,5 +1,5 @@
 {
   "name": "EmpireCred",
-  "description": "Plataforma completa de solicitação de crédito pessoal e com garantia veicular.",
-  "requestFramePermissions": ["camera", "microphone"]
+  "description": "Plataforma de crédito pessoal. Período de repagamento: 3 a 12 meses. Taxa de Juros Máxima (APR): 98,6% ao ano. Exemplo: Empréstimo de R$ 1.000,00 em 12x de R$ 118,61 (Total R$ 1.423,32).",
+  "requestFramePermissions": ["camera"]
 }

@@ -18,6 +18,8 @@ import Profile from './components/Profile';
 import Statement from './components/Statement';
 import ReservaEmpireCred from './components/ReservaEmpireCred';
 import PinScreen from './components/PinScreen';
+import PrivacyPolicy from './components/PrivacyPolicy';
+import TermsOfUse from './components/TermsOfUse';
 
 function PageLoader() {
   const location = useLocation();
@@ -214,6 +216,9 @@ export default function App() {
               path="/admin" 
               element={user && (profile?.role === 'admin' || user.email === 'sophiabeginsky@gmail.com') ? <AdminPanel profile={profile} /> : <Navigate to="/dashboard" />} 
             />
+
+            <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/terms" element={<TermsOfUse />} />
           </Routes>
         )}
       </div>

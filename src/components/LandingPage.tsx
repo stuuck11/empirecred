@@ -195,6 +195,10 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
         <p className="text-[9px] text-zinc-400 uppercase tracking-widest leading-relaxed">
           Esta plataforma atua como correspondente bancário. A concessão de crédito é realizada por instituições financeiras parceiras.
         </p>
+        <div className="flex justify-center space-x-4 pt-2">
+          <button onClick={() => navigate('/privacy')} className="text-[10px] font-bold text-zinc-400 hover:text-zinc-900 uppercase tracking-widest">Privacidade</button>
+          <button onClick={() => navigate('/terms')} className="text-[10px] font-bold text-zinc-400 hover:text-zinc-900 uppercase tracking-widest">Termos</button>
+        </div>
       </div>
     </div>
   );

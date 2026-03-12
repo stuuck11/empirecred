@@ -66,7 +66,7 @@ export default function PinScreen({ profile, onVerified, onLogout, initialMode }
         } else if (mode === 'confirm') {
           const setupPinString = pin.join('');
           if (pinString === setupPinString) {
-            handleConfirm();
+            handleConfirm(pinString);
           } else {
             setError('As senhas não coincidem');
             setConfirmPin(['', '', '', '', '', '']);
@@ -83,11 +83,11 @@ export default function PinScreen({ profile, onVerified, onLogout, initialMode }
     }
   };
 
-  const handleConfirm = async () => {
+  const handleConfirm = async (forcedConfirmPin?: string) => {
     setError(null);
     const pinString = pin.join('');
     
-    if (pinString.length < 6) {
+    if (pinString.length < 6 && mode !== 'confirm') {
       setError('A senha deve ter 6 dígitos');
       return;
     }
@@ -104,7 +104,7 @@ export default function PinScreen({ profile, onVerified, onLogout, initialMode }
       setMode('confirm');
       inputRefs.current[0]?.focus();
     } else if (mode === 'confirm') {
-      const confirmPinString = confirmPin.join('');
+      const confirmPinString = forcedConfirmPin || confirmPin.join('');
       if (pinString === confirmPinString) {
         setLoading(true);
         try {

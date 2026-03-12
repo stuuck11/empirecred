@@ -454,6 +454,36 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
     return pmt;
   };
 
+  const LegalFooter = () => (
+    <div className="mt-8 pt-8 border-t border-zinc-100 space-y-6 text-[10px] text-zinc-400 leading-relaxed text-center">
+      <div className="space-y-2">
+        <p className="font-bold text-zinc-500 uppercase tracking-widest">Informações Legais</p>
+        <p>
+          A EmpireCred é uma plataforma digital que facilita o acesso ao crédito. Não somos uma instituição financeira. 
+          O crédito é concedido por instituições parceiras autorizadas pelo Banco Central do Brasil.
+        </p>
+        <p>
+          <strong>Período de repagamento:</strong> Mínimo de 3 meses e máximo de 12 meses. 
+          <strong> Taxa de Juros (APR):</strong> Taxa mensal de 5,89% (98,6% ao ano).
+        </p>
+        <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-100 text-left">
+          <p className="font-bold text-zinc-500 mb-1 uppercase tracking-tighter">Exemplo Representativo:</p>
+          <p>
+            Para um empréstimo de R$ 1.000,00 com pagamento em 12 parcelas mensais, cada parcela será de R$ 118,61. 
+            O valor total a ser pago ao final do contrato será de R$ 1.423,32. 
+            Este valor inclui juros de 5,89% ao mês e impostos (IOF).
+          </p>
+        </div>
+      </div>
+      <div className="flex justify-center space-x-4 font-bold uppercase tracking-widest">
+        <button onClick={() => navigate('/privacy')} className="hover:text-zinc-900 transition-colors">Privacidade</button>
+        <span>•</span>
+        <button onClick={() => navigate('/terms')} className="hover:text-zinc-900 transition-colors">Termos</button>
+      </div>
+      <p>© 2026 EmpireCred. Todos os direitos reservados.</p>
+    </div>
+  );
+
   const handleContract = async () => {
     if (!selectedAmount) return;
     setStep(3);
@@ -972,6 +1002,8 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
                     )}
                   </button>
                 </div>
+
+                <LegalFooter />
               </motion.div>
             )}
 
@@ -1132,6 +1164,8 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
                     </div>
                   </div>
                 )}
+
+                <LegalFooter />
               </motion.div>
             )}
             {step === 3 && selectedAmount && (

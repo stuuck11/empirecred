@@ -36,9 +36,32 @@ export default function Profile({ profile, onLogout }: { profile: UserProfile, o
   };
 
   const handleDeleteAccount = async () => {
-    if (window.confirm('Tem certeza que deseja excluir sua conta? Esta ação é irreversível.')) {
-      onLogout();
-      navigate('/');
+    if (window.confirm('Tem certeza que deseja excluir sua conta? Esta ação é irreversível e todos os seus dados serão apagados.')) {
+      setSaving(true);
+      try {
+        // 1. Delete Firestore profile
+        const userRef = doc(db, 'users', profile.uid);
+        await deleteDoc(userRef);
+        
+        // 2. Delete Auth user
+        const user = auth.currentUser;
+        if (user) {
+          await deleteUser(user);
+        }
+        
+        onLogout();
+        navigate('/');
+        alert('Sua conta foi excluída com sucesso.');
+      } catch (error: any) {
+        console.error("Error deleting account:", error);
+        if (error.code === 'auth/requires-recent-login') {
+          alert('Para excluir sua conta, você precisa ter feito login recentemente. Por favor, saia e entre novamente.');
+        } else {
+          alert('Erro ao excluir conta. Por favor, entre em contato com o suporte.');
+        }
+      } finally {
+        setSaving(false);
+      }
     }
   };
 
