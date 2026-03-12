@@ -201,7 +201,7 @@ async function startServer() {
           phone: '17981568291',
           document: '45771930865',
           address: {
-            zipcode: '01310-100',
+            zipCode: '01310-100',
             street: 'Avenida Paulista',
             number: '1000',
             neighborhood: 'Bela Vista',
