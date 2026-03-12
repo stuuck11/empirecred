@@ -199,7 +199,16 @@ async function startServer() {
           name: 'Roger EmpireCred',
           email: 'cliente@empirecred.com',
           phone: '17981568291',
-          document: '45771930865'
+          document: '45771930865',
+          address: {
+            zipcode: '01310-100',
+            street: 'Avenida Paulista',
+            number: '1000',
+            neighborhood: 'Bela Vista',
+            city: 'São Paulo',
+            state: 'SP',
+            country: 'BR'
+          }
         },
         metadata: {
           origin: 'EmpireCred App',
@@ -268,6 +277,11 @@ async function startServer() {
       
       // Captura a imagem do QR Code (base64 ou URL)
       let pixQrCode = pixData.base64 || pixData.image || pixData.qr_code || data.encodedImage;
+      
+      // CORREÇÃO: Se for base64 puro, adiciona o prefixo de imagem
+      if (pixQrCode && typeof pixQrCode === 'string' && !pixQrCode.startsWith('http') && !pixQrCode.startsWith('data:')) {
+        pixQrCode = `data:image/png;base64,${pixQrCode}`;
+      }
       
       // Se não vier imagem mas tiver o código, gera um QR Code via API secundária para garantir
       if (!pixQrCode && pixCode) {
