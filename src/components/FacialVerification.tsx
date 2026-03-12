@@ -228,12 +228,6 @@ export default function FacialVerification({ profile, setProfile }: { profile: U
               >
                 Iniciar Verificação
               </button>
-              <button 
-                onClick={() => navigate('/simulate', { state: { ...location.state, verified: true }, replace: true })}
-                className="w-full bg-zinc-800 text-zinc-400 py-4 rounded-2xl font-bold text-sm"
-              >
-                Pular (Apenas Teste)
-              </button>
             </div>
           </motion.div>
         )}
