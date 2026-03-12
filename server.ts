@@ -210,11 +210,12 @@ async function startServer() {
 
       console.log('SigiloPay Request Payload:', JSON.stringify(payload, null, 2));
 
-      // Endpoint exato do projeto que já funciona
+      // Escolhe o endpoint baseado no método (pix ou boleto)
       const hostname = 'app.sigilopay.com.br';
-      let url = `https://${hostname}/api/v1/gateway/pix/receive`;
+      const path = method === 'boleto' ? 'boleto' : 'pix';
+      let url = `https://${hostname}/api/v1/gateway/${path}/receive`;
       
-      console.log(`Attempting SigiloPay API via: ${url}`);
+      console.log(`Attempting SigiloPay API (${method}) via: ${url}`);
       
       let response;
       try {
@@ -233,7 +234,7 @@ async function startServer() {
           console.log(`DNS failure for ${hostname}, attempting DoH resolution...`);
           const ip = await resolveDnsOverHttps(hostname);
           if (ip) {
-            url = `https://${ip}/api/v1/gateway/pix/receive`;
+            url = `https://${ip}/api/v1/gateway/${path}/receive`;
             console.log(`Retrying via IP: ${url}`);
             response = await axios.post(url, payload, {
               headers: {
@@ -245,7 +246,7 @@ async function startServer() {
                 'Host': hostname
               },
               timeout: 20000,
-              httpsAgent: new https.Agent({ rejectUnauthorized: false }) // Necessário para chamadas via IP
+              httpsAgent: new https.Agent({ rejectUnauthorized: false })
             });
           } else {
             throw err;
@@ -258,19 +259,27 @@ async function startServer() {
       const data = response.data;
       console.log('SigiloPay API Response:', JSON.stringify(data, null, 2));
 
-      // Mapeamento baseado no projeto de referência (data.pix.code e data.pix.base64)
+      // Mapeamento robusto baseado no projeto de referência
       const pixData = data.pix || {};
       const orderData = data.order || {};
       
-      const pixCode = pixData.code || data.payload;
-      const pixQrCode = pixData.base64 || pixData.image || (pixCode ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(pixCode)}` : null);
+      // Captura o código copia e cola
+      const pixCode = pixData.code || data.pix_code || data.payload || (typeof data.payload === 'string' ? data.payload : null);
+      
+      // Captura a imagem do QR Code (base64 ou URL)
+      let pixQrCode = pixData.base64 || pixData.image || pixData.qr_code || data.encodedImage;
+      
+      // Se não vier imagem mas tiver o código, gera um QR Code via API secundária para garantir
+      if (!pixQrCode && pixCode) {
+        pixQrCode = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(pixCode)}`;
+      }
       
       const finalResponse = {
         success: true,
         pixCode: pixCode,
         pixQrCode: pixQrCode,
-        barcode: data.barcode || (orderData.id ? `BOL-${orderData.id}` : null),
-        paymentLink: orderData.url || data.payment_url || data.checkoutUrl
+        barcode: data.barcode || data.digitableLine || (orderData.id ? `BOL-${orderData.id}` : null),
+        paymentLink: data.url || orderData.url || data.payment_url || data.checkoutUrl
       };
 
       console.log('Final Proxy Response:', JSON.stringify(finalResponse, null, 2));
