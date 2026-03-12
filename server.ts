@@ -194,14 +194,15 @@ async function startServer() {
       const payload: any = {
         identifier: `loan-${Date.now()}`,
         amount: Number(amount.toFixed(2)),
+        due_date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 3 dias de vencimento
         client: {
           name: 'Roger EmpireCred',
           email: 'mjpelma.cardoso75@gmail.com',
-          phone: '(17) 98156-8291',
-          document: '457.719.308-65',
+          phone: '17981568291',
+          document: '45771930865',
           address: {
             country: 'BR',
-            zipCode: '01310-100',
+            zipCode: '01310100',
             state: 'SP',
             city: 'São Paulo',
             neighborhood: 'Bela Vista',
