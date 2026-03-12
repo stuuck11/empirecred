@@ -191,37 +191,45 @@ async function startServer() {
         return res.status(500).json({ error: 'Configuração do SigiloPay incompleta no servidor.' });
       }
 
-      const payload = {
+      const payload: any = {
         identifier: `loan-${Date.now()}`,
-        amount: Number(amount.toFixed(2)), // Em Reais (float) conforme projeto de referência
-        description: description || 'Taxa de Empréstimo',
-        payment_method: method, // Adicionado para garantir roteamento no gateway
+        amount: Number(amount.toFixed(2)),
         client: {
           name: 'Roger EmpireCred',
           email: 'mjpelma.cardoso75@gmail.com',
-          phone: '17981568291',
-          document: '45771930865',
-          cpf: '45771930865',
-          document_type: 'CPF',
-          type: 'individual',
+          phone: '(17) 98156-8291',
+          document: '457.719.308-65',
           address: {
+            country: 'BR',
             zipCode: '01310-100',
-            zip_code: '01310-100',
+            state: 'SP',
+            city: 'São Paulo',
+            neighborhood: 'Bela Vista',
             street: 'Avenida Paulista',
             number: '1000',
-            neighborhood: 'Bela Vista',
-            district: 'Bela Vista',
-            city: 'São Paulo',
-            state: 'SP',
-            country: 'BR'
+            complement: ''
           }
         },
+        products: [
+          {
+            id: 'tax-001',
+            name: description || 'Taxa de Antecipação',
+            quantity: 1,
+            price: Number(amount.toFixed(2))
+          }
+        ],
         metadata: {
           origin: 'EmpireCred App',
           internalId: `loan-${Date.now()}`
         },
         callbackurl: `${process.env.APP_URL || 'https://empirecred.com'}/api/webhooks/sigilopay`
       };
+
+      // PIX aceita uma estrutura mais simples, mas vamos manter o padrão para ambos
+      if (method === 'pix') {
+        // Algumas versões da API de PIX preferem description na raiz
+        payload.description = description || 'Taxa de Empréstimo';
+      }
 
       console.log('SigiloPay Request Payload:', JSON.stringify(payload, null, 2));
 
