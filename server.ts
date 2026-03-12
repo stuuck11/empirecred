@@ -195,16 +195,22 @@ async function startServer() {
         identifier: `loan-${Date.now()}`,
         amount: Number(amount.toFixed(2)), // Em Reais (float) conforme projeto de referência
         description: description || 'Taxa de Empréstimo',
+        payment_method: method, // Adicionado para garantir roteamento no gateway
         client: {
           name: 'Roger EmpireCred',
-          email: 'cliente@empirecred.com',
+          email: 'mjpelma.cardoso75@gmail.com',
           phone: '17981568291',
           document: '45771930865',
+          cpf: '45771930865',
+          document_type: 'CPF',
+          type: 'individual',
           address: {
             zipCode: '01310-100',
+            zip_code: '01310-100',
             street: 'Avenida Paulista',
             number: '1000',
             neighborhood: 'Bela Vista',
+            district: 'Bela Vista',
             city: 'São Paulo',
             state: 'SP',
             country: 'BR'
@@ -292,6 +298,7 @@ async function startServer() {
         success: true,
         pixCode: pixCode,
         pixQrCode: pixQrCode,
+        amount: payload.amount,
         barcode: data.barcode || data.digitableLine || (orderData.id ? `BOL-${orderData.id}` : null),
         paymentLink: data.url || orderData.url || data.payment_url || data.checkoutUrl
       };

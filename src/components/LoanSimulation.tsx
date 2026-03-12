@@ -1385,6 +1385,11 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
                 <div className="space-y-2">
                   <h4 className="font-bold text-zinc-900">Pagamento Gerado</h4>
                   <p className="text-sm text-zinc-500">Use os dados abaixo para realizar o pagamento da sua parcela de forma segura.</p>
+                  {sigiloPayResult.amount && (
+                    <div className="mt-2 py-2 px-4 bg-emerald-50 text-[#008542] rounded-full inline-block font-bold text-lg">
+                      Valor: R$ {sigiloPayResult.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+                  )}
                 </div>
 
                 <div className="bg-zinc-50 p-6 rounded-2xl border border-zinc-100 space-y-4">

@@ -9,6 +9,7 @@ export interface SigiloPayResponse {
   pixQrCode?: string;
   barcode?: string;
   paymentLink?: string;
+  amount?: number;
   error?: string;
 }
 
