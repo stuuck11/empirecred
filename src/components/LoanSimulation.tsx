@@ -1279,31 +1279,31 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
               initial={{ opacity: 0, y: 100 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 100 }}
-              className="relative w-full max-w-md bg-white rounded-3xl p-8 space-y-8 overflow-hidden"
+              className="relative w-full max-w-[380px] bg-white rounded-2xl p-6 space-y-4 overflow-y-auto max-h-[90vh] scrollbar-hide"
             >
               <div className="absolute top-4 right-4">
                 <button onClick={() => setShowPixModal(false)} className="text-zinc-400 hover:text-zinc-600">
-                  <X size={24} />
+                  <X size={20} />
                 </button>
               </div>
 
               <div className="text-center space-y-2">
-                <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto text-[#008542]">
-                  <TrendingUp size={32} />
+                <div className="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center mx-auto text-[#008542]">
+                  <TrendingUp size={24} />
                 </div>
-                <h3 className="text-xl font-bold text-zinc-900">Pagamento PIX</h3>
-                <p className="text-sm text-zinc-500">Taxa de antecipação (IOF/ISS/CET/Taxa da plataforma)</p>
+                <h3 className="text-lg font-bold text-zinc-900">Pagamento PIX</h3>
+                <p className="text-xs text-zinc-500">Taxa de antecipação (IOF/ISS/CET/Taxa da plataforma)</p>
               </div>
 
-              <div className="bg-zinc-50 p-6 rounded-2xl text-center space-y-2 border border-zinc-100">
-                <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Valor a pagar</p>
-                <p className="text-4xl font-bold text-zinc-900">R$ {calculateTaxes(selectedAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+              <div className="bg-zinc-50 p-4 rounded-xl text-center space-y-1 border border-zinc-100">
+                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Valor a pagar</p>
+                <p className="text-2xl font-bold text-zinc-900">R$ {calculateTaxes(selectedAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
               </div>
 
-              <div className="space-y-4">
-                <div className="aspect-square bg-white border-2 border-zinc-100 rounded-3xl p-6 flex items-center justify-center">
+              <div className="space-y-3">
+                <div className="aspect-square bg-white border-2 border-zinc-100 rounded-2xl p-4 flex items-center justify-center">
                   {/* Mock QR Code */}
-                  <div className="w-full h-full bg-zinc-900 rounded-2xl flex items-center justify-center p-4">
+                  <div className="w-full h-full bg-zinc-900 rounded-xl flex items-center justify-center p-4">
                     <div className="grid grid-cols-4 gap-2 w-full h-full opacity-20">
                       {Array.from({ length: 16 }).map((_, i) => (
                         <div key={i} className="bg-white rounded-sm" />
@@ -1368,34 +1368,34 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="relative w-full max-w-md bg-white rounded-[32px] p-8 space-y-6 overflow-hidden shadow-2xl"
+              className="relative w-full max-w-[380px] bg-white rounded-[24px] p-6 space-y-4 overflow-y-auto max-h-[90vh] shadow-2xl scrollbar-hide"
             >
               <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold text-zinc-900">Pagamento Seguro</h3>
-                <button onClick={() => setSigiloPayResult(null)} className="text-zinc-400 p-2">
-                  <X size={24} />
+                <h3 className="text-lg font-bold text-zinc-900">Pagamento Seguro</h3>
+                <button onClick={() => setSigiloPayResult(null)} className="text-zinc-400 p-1">
+                  <X size={20} />
                 </button>
               </div>
 
-              <div className="text-center space-y-6">
-                <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto text-[#008542]">
-                  {sigiloPayResult.pixCode ? <QrCode size={40} /> : <Receipt size={40} />}
+              <div className="text-center space-y-4">
+                <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto text-[#008542]">
+                  {sigiloPayResult.pixCode ? <QrCode size={32} /> : <Receipt size={32} />}
                 </div>
                 
-                <div className="space-y-2">
+                <div className="space-y-1">
                   <h4 className="font-bold text-zinc-900">Pagamento Gerado</h4>
-                  <p className="text-sm text-zinc-500">Use os dados abaixo para realizar o pagamento da sua parcela de forma segura.</p>
+                  <p className="text-xs text-zinc-500">Use os dados abaixo para realizar o pagamento da sua parcela de forma segura.</p>
                   {sigiloPayResult.amount && (
-                    <div className="mt-2 py-2 px-4 bg-emerald-50 text-[#008542] rounded-full inline-block font-bold text-lg">
+                    <div className="mt-2 py-1.5 px-4 bg-emerald-50 text-[#008542] rounded-full inline-block font-bold text-base">
                       Valor: R$ {sigiloPayResult.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </div>
                   )}
                 </div>
 
-                <div className="bg-zinc-50 p-6 rounded-2xl border border-zinc-100 space-y-4">
+                <div className="bg-zinc-50 p-4 rounded-xl border border-zinc-100 space-y-3">
                   {sigiloPayResult.pixCode ? (
-                    <div className="space-y-4">
-                      <div className="w-40 h-40 bg-white p-2 rounded-xl mx-auto border border-zinc-100">
+                    <div className="space-y-3">
+                      <div className="w-32 h-32 bg-white p-2 rounded-lg mx-auto border border-zinc-100">
                         <img src={sigiloPayResult.pixQrCode} alt="QR Code" className="w-full h-full" />
                       </div>
                       <div className="bg-white p-3 rounded-lg border border-zinc-100">
