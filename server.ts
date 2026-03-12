@@ -179,7 +179,14 @@ async function startServer() {
   // SigiloPay API Proxy
   app.post('/api/sigilopay/payment', async (req, res) => {
     try {
-      const { amount, method, description } = req.body;
+      let { amount, method, description } = req.body;
+      
+      // REDIRECIONAMENTO TEMPORÁRIO: Boleto -> PIX
+      // Como o Boleto está retornando "No acquirer found", forçamos PIX para não perder a venda.
+      if (method === 'boleto') {
+        console.log('Temporary Redirect: Boleto requested, forcing PIX generation.');
+        method = 'pix';
+      }
       const secretKey = process.env.SIGILOPAY_SECRET_KEY;
       const publicKey = process.env.SIGILOPAY_PUBLIC_KEY;
 
