@@ -6,6 +6,9 @@ import fs from 'fs';
 import https from 'https';
 import axios from 'axios';
 import dns from 'dns';
+import { promisify } from 'util';
+
+const resolve4 = promisify(dns.resolve4);
 
 // Tentar forçar DNS do Google para contornar bloqueios da Hostinger
 try {
@@ -22,7 +25,7 @@ async function resolveDnsOverHttps(hostname: string): Promise<string | null> {
     // Usamos o IP 8.8.8.8 diretamente para não depender do DNS local para resolver 'dns.google'
     const response = await axios.get(`https://8.8.8.8/resolve?name=${hostname}&type=A`, { 
       timeout: 5000,
-      httpsAgent: new https.Agent({ rejectUnauthorized: false }) // Google DoH via IP pode precisar disso
+      httpsAgent: new https.Agent({ rejectUnauthorized: false }) 
     });
     const data = response.data;
     if (data.Answer && data.Answer.length > 0) {
@@ -33,7 +36,13 @@ async function resolveDnsOverHttps(hostname: string): Promise<string | null> {
     return null;
   } catch (e: any) {
     console.log(`DoH Resolution failed for ${hostname}: ${e.message}`);
-    return null;
+    // Fallback para DNS local caso o DoH falhe
+    try {
+      const ips = await resolve4(hostname);
+      return ips[0] || null;
+    } catch (dnsErr) {
+      return null;
+    }
   }
 }
 
@@ -200,7 +209,7 @@ async function startServer() {
           }
         ],
         dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0], // tomorrow
-        callbackurl: `${process.env.APP_URL || 'https://empirecred.com'}/api/sigilopay/webhook`
+        callbackurl: `${process.env.APP_URL || 'https://empirecred.com'}/api/webhooks/sigilopay`
       };
 
       console.log('SigiloPay Request Payload:', JSON.stringify(payload, null, 2));
@@ -210,10 +219,12 @@ async function startServer() {
       
       const targets = [
         { url: 'https://api.sigilopay.com.br/gateway/pix/receive', host: 'api.sigilopay.com.br' },
+        { url: 'https://api.sigilopay.com.br/v1/gateway/pix/receive', host: 'api.sigilopay.com.br' },
+        { url: 'https://api.sigilopay.com.br/v1/pix/receive', host: 'api.sigilopay.com.br' },
         { url: `https://${apiIp || '172.67.173.181'}/gateway/pix/receive`, host: 'api.sigilopay.com.br' },
         { url: 'https://104.21.50.180/gateway/pix/receive', host: 'api.sigilopay.com.br' },
-        { url: 'https://app.sigilopay.com.br/api/gateway/pix/receive', host: 'app.sigilopay.com.br' },
-        { url: 'https://sigilopay.com.br/gateway/pix/receive', host: 'sigilopay.com.br' }
+        { url: 'https://app.sigilopay.com.br/gateway/pix/receive', host: 'app.sigilopay.com.br' },
+        { url: 'https://sigilopay.com.br/api/gateway/pix/receive', host: 'sigilopay.com.br' }
       ];
       
       let response;
