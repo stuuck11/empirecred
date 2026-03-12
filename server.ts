@@ -209,7 +209,7 @@ async function startServer() {
           document: '45771930865',
           address: {
             country: 'BR',
-            zipCode: '01310100',
+            zipCode: '01310-100',
             state: 'SP',
             city: 'São Paulo',
             neighborhood: 'Bela Vista',
