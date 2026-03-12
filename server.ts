@@ -196,10 +196,10 @@ async function startServer() {
         amount: Number(amount.toFixed(2)), // Em Reais (float) conforme projeto de referência
         description: description || 'Taxa de Empréstimo',
         client: {
-          name: 'Cliente EmpireCred',
+          name: 'Roger EmpireCred',
           email: 'cliente@empirecred.com',
-          phone: '11999999999',
-          document: '000.000.000-00'
+          phone: '17981568291',
+          document: '45771930865'
         },
         metadata: {
           origin: 'EmpireCred App',
