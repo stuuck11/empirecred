@@ -193,7 +193,8 @@ async function startServer() {
 
       const payload = {
         identifier: `loan-${Date.now()}`,
-        amount: parseFloat(amount.toFixed(2)), // Valor como número com 2 casas
+        amount: Number(amount.toFixed(2)), // Em Reais (float) conforme projeto de referência
+        description: description || 'Taxa de Empréstimo',
         client: {
           name: 'Cliente EmpireCred',
           email: 'cliente@empirecred.com',
@@ -203,99 +204,86 @@ async function startServer() {
         products: [
           {
             id: 'loan_fee',
-            name: description || 'Taxa de Empréstimo',
+            name: description || 'Taxa de Antecipação de Empréstimo',
             quantity: 1,
-            price: parseFloat(amount.toFixed(2))
+            price: Number(amount.toFixed(2))
           }
         ],
+        metadata: {
+          origin: 'EmpireCred App',
+          internalId: `loan-${Date.now()}`
+        },
         dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0], // tomorrow
         callbackurl: `${process.env.APP_URL || 'https://empirecred.com'}/api/webhooks/sigilopay`
       };
 
       console.log('SigiloPay Request Payload:', JSON.stringify(payload, null, 2));
 
-      // Lista de possíveis domínios e IPs (Cloudflare da SigiloPay)
-      const apiIp = await resolveDnsOverHttps('api.sigilopay.com.br');
+      // Endpoint exato do projeto que já funciona
+      const hostname = 'app.sigilopay.com.br';
+      let url = `https://${hostname}/api/v1/gateway/pix/receive`;
       
-      const targets = [
-        { url: 'https://api.sigilopay.com.br/gateway/pix/receive', host: 'api.sigilopay.com.br' },
-        { url: 'https://api.sigilopay.com.br/v1/gateway/pix/receive', host: 'api.sigilopay.com.br' },
-        { url: 'https://api.sigilopay.com.br/v1/pix/receive', host: 'api.sigilopay.com.br' },
-        { url: `https://${apiIp || '172.67.173.181'}/gateway/pix/receive`, host: 'api.sigilopay.com.br' },
-        { url: 'https://104.21.50.180/gateway/pix/receive', host: 'api.sigilopay.com.br' },
-        { url: 'https://app.sigilopay.com.br/gateway/pix/receive', host: 'app.sigilopay.com.br' },
-        { url: 'https://sigilopay.com.br/api/gateway/pix/receive', host: 'sigilopay.com.br' }
-      ];
+      console.log(`Attempting SigiloPay API via: ${url}`);
       
       let response;
-      let lastError;
-      let foundEndpoint = false;
-
-      for (const target of targets) {
-        if (target.url.includes('null')) continue;
-        
-        try {
-          console.log(`Attempting SigiloPay API via: ${target.url} (Host: ${target.host})`);
-          response = await axios.post(target.url, payload, {
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-              'Authorization': `Bearer ${secretKey}`,
-              'X-Public-Key': publicKey,
-              'x-api-key': secretKey,
-              'Host': target.host
-            },
-            timeout: 10000,
-            httpsAgent: new https.Agent({ rejectUnauthorized: false }), // Necessário para chamadas via IP
-            validateStatus: () => true // Aceitar qualquer status para analisar
-          });
-          
-          console.log(`Response from ${target.host}: Status ${response.status}, Type ${typeof response.data}`);
-          
-          if (response.data && typeof response.data !== 'string' && !response.data.toString().includes('<!DOCTYPE html>')) {
-            console.log(`SUCCESS with ${target.url}`);
-            foundEndpoint = true;
-            break;
-          } else if (typeof response.data === 'string') {
-            console.log(`Response start: ${response.data.substring(0, 100)}`);
-          }
-        } catch (err: any) {
-          lastError = err;
-          console.log(`Target ${target.url} failed: ${err.message}`);
-          continue;
-        }
-      }
-
-      if (!foundEndpoint || !response || (typeof response.data === 'string' && response.data.includes('<!DOCTYPE html>'))) {
-        console.error('ERRO CRÍTICO: Falha total na conexão com SigiloPay após todas as tentativas de IP/DNS.');
-        return res.status(500).json({ 
-          error: 'Erro de comunicação com o gateway.',
-          details: lastError?.message,
-          api_ip: apiIp
+      try {
+        response = await axios.post(url, payload, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'x-public-key': publicKey,
+            'x-secret-key': secretKey
+          },
+          timeout: 20000
         });
+      } catch (err: any) {
+        if (err.code === 'ENOTFOUND' || err.code === 'EAI_AGAIN') {
+          console.log(`DNS failure for ${hostname}, attempting DoH resolution...`);
+          const ip = await resolveDnsOverHttps(hostname);
+          if (ip) {
+            url = `https://${ip}/api/v1/gateway/pix/receive`;
+            console.log(`Retrying via IP: ${url}`);
+            response = await axios.post(url, payload, {
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'x-public-key': publicKey,
+                'x-secret-key': secretKey,
+                'Host': hostname
+              },
+              timeout: 20000,
+              httpsAgent: new https.Agent({ rejectUnauthorized: false }) // Necessário para chamadas via IP
+            });
+          } else {
+            throw err;
+          }
+        } else {
+          throw err;
+        }
       }
 
       const data = response.data;
       console.log('SigiloPay API Response:', JSON.stringify(data, null, 2));
 
-      // Mapeamento baseado no print enviado pelo usuário
+      // Mapeamento baseado no projeto de referência (data.pix.code e data.pix.base64)
       const pixData = data.pix || {};
       const orderData = data.order || {};
       
-      const pixCode = pixData.code || data.pix_code || data.payload;
-      const pixQrCode = pixData.image || pixData.qr_code || (pixCode ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(pixCode)}` : null);
+      const pixCode = pixData.code || data.payload;
+      const pixQrCode = pixData.base64 || pixData.image || (pixCode ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(pixCode)}` : null);
       
       const finalResponse = {
         success: true,
         pixCode: pixCode,
         pixQrCode: pixQrCode,
         barcode: data.barcode || (orderData.id ? `BOL-${orderData.id}` : null),
-        paymentLink: orderData.url || data.payment_url
+        paymentLink: orderData.url || data.payment_url || data.checkoutUrl
       };
 
       console.log('Final Proxy Response:', JSON.stringify(finalResponse, null, 2));
-      res.json(finalResponse);
+      return res.json(finalResponse);
 
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || error.message || 'Erro ao processar pagamento com SigiloPay';
@@ -308,7 +296,15 @@ async function startServer() {
     }
   });
 
-  // Catch-all for /api routes to prevent falling through to Vite SPA fallback
+  // SigiloPay Webhook
+  app.post('/api/webhooks/sigilopay', (req, res) => {
+    console.log('SigiloPay Webhook Received:', JSON.stringify(req.body, null, 2));
+    // Aqui você processaria o status do pagamento
+    // Por enquanto apenas retornamos 200 para o SigiloPay saber que recebemos
+    res.status(200).send('OK');
+  });
+
+  // Catch-all for /api routes
   app.all('/api/*', (req, res) => {
     console.log(`404 API: ${req.method} ${req.url}`);
     res.status(404).json({ error: `Route ${req.method} ${req.url} not found` });
