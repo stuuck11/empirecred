@@ -3,8 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Shield, CheckCircle2, X, Camera, User, ArrowLeft, ArrowRight, Maximize, Minimize, Fingerprint } from 'lucide-react';
 import { doc, setDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage, handleFirestoreError, OperationType } from '../firebase';
+import { db, handleFirestoreError, OperationType } from '../firebase';
 import { UserProfile } from '../types';
 
 export default function FacialVerification({ profile, setProfile }: { profile: UserProfile, setProfile: (p: UserProfile) => void }) {
@@ -35,6 +34,7 @@ export default function FacialVerification({ profile, setProfile }: { profile: U
     if (recording && timeLeft > 0) {
       interval = setInterval(() => {
         setTimeLeft(prev => prev - 1);
+        // Change instruction every 8 seconds (original timing for 40s)
         if ((40 - timeLeft) % 8 === 0) {
           const idx = Math.floor((40 - timeLeft) / 8) % instructionData.length;
           setInstruction(instructionData[idx].text);
@@ -77,7 +77,7 @@ export default function FacialVerification({ profile, setProfile }: { profile: U
             
           const mediaRecorder = new MediaRecorder(stream, {
             mimeType: mimeType || undefined,
-            videoBitsPerSecond: 5000000 // 5Mbps for high quality
+            videoBitsPerSecond: 1500000 // 1.5Mbps is enough for mobile verification
           });
           mediaRecorderRef.current = mediaRecorder;
           chunksRef.current = [];
@@ -115,14 +115,36 @@ export default function FacialVerification({ profile, setProfile }: { profile: U
     
     setLoading(true);
     setStep(3); // Move to processing screen immediately
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+
     try {
-      const cpf = (profile.cpf || '').replace(/\D/g, '');
-      const storageRef = ref(storage, `verifications/${cpf}-${Date.now()}.mp4`);
+      const formData = new FormData();
+      formData.append('cpf', profile.cpf || ''); // Send CPF for filename
+      formData.append('video', blob, 'verification.mp4');
+
+      const response = await fetch('/api/upload-verification', {
+        method: 'POST',
+        body: formData,
+        signal: controller.signal
+      });
       
-      console.log("Uploading video to Firebase Storage...");
-      const snapshot = await uploadBytes(storageRef, blob);
-      const videoUrl = await getDownloadURL(snapshot.ref);
-      console.log("Video uploaded successfully:", videoUrl);
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Falha no upload: ${response.status} ${errorText}`);
+      }
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        throw new Error('Resposta do servidor inválida (não JSON)');
+      }
+
+      const data = await response.json();
+      const videoUrl = data.videoUrl;
 
       // Update User Profile
       const userRef = doc(db, 'users', profile.uid);

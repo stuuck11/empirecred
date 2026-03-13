@@ -151,19 +151,21 @@ async function startServer() {
 
   // Endpoint de Upload de Vídeo de Verificação Facial
   app.post('/api/upload-verification', (req, res, next) => {
-    console.log('POST /api/upload-verification');
+    console.log(`[${new Date().toISOString()}] Início do upload de biometria...`);
     next();
   }, upload.single('video'), (req, res) => {
     try {
       if (!req.file) {
+        console.error('Erro: Nenhum arquivo recebido no upload de biometria');
         return res.status(400).json({ error: 'O vídeo de verificação é obrigatório.' });
       }
 
+      console.log(`[${new Date().toISOString()}] Upload de biometria concluído: ${req.file.filename} (${req.file.size} bytes)`);
       res.json({
         videoUrl: `/uploads/documents/${req.file.filename}`
       });
     } catch (error) {
-      console.error('Erro no upload do vídeo:', error);
+      console.error('Erro no processamento do upload do vídeo:', error);
       res.status(500).json({ error: 'Erro interno no servidor ao processar upload do vídeo.' });
     }
   });
