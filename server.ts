@@ -125,7 +125,7 @@ async function startServer() {
 
   // Endpoint de Upload de Documentos
   app.post('/api/upload-document', (req, res, next) => {
-    console.log('POST /api/upload-document');
+    console.log(`[${new Date().toISOString()}] Início do upload de documentos (frente/verso)...`);
     next();
   }, upload.fields([
     { name: 'front', maxCount: 1 },
@@ -135,16 +135,18 @@ async function startServer() {
       const files = req.files as any;
       
       if (!files || !files.front || !files.back) {
+        console.error('Erro: Arquivos incompletos no upload de documentos');
         return res.status(400).json({ error: 'Ambos os arquivos (frente e verso) são obrigatórios.' });
       }
 
+      console.log(`[${new Date().toISOString()}] Upload de documentos concluído: Frente=${files.front[0].filename}, Verso=${files.back[0].filename}`);
       // Retorna as URLs relativas para salvar no banco
       res.json({
         frontUrl: `/uploads/documents/${files.front[0].filename}`,
         backUrl: `/uploads/documents/${files.back[0].filename}`
       });
     } catch (error) {
-      console.error('Erro no upload:', error);
+      console.error('Erro no processamento do upload de documentos:', error);
       res.status(500).json({ error: 'Erro interno no servidor ao processar upload.' });
     }
   });
