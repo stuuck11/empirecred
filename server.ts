@@ -7,19 +7,18 @@ import https from 'https';
 import axios from 'axios';
 import dns from 'dns';
 import { promisify } from 'util';
-import * as admin from 'firebase-admin';
+import { initializeApp, getApps, getApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 
 // Inicializar Firebase Admin
 const firebaseConfig = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'firebase-applet-config.json'), 'utf8'));
-if (!admin.apps.length) {
-  admin.initializeApp({
-    projectId: firebaseConfig.projectId,
-  });
-}
+const app = getApps().length === 0 
+  ? initializeApp({ projectId: firebaseConfig.projectId })
+  : getApp();
+
 const firestoreDbId = firebaseConfig.firestoreDatabaseId || '(default)';
 // Se houver um databaseId específico no config, usamos ele
-const database = getFirestore(admin.app(), firestoreDbId);
+const database = getFirestore(app, firestoreDbId);
 const db = database; // Alias para compatibilidade se necessário
 
 const resolve4 = promisify(dns.resolve4);
