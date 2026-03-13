@@ -202,27 +202,26 @@ async function startServer() {
 
   // SigiloPay API Proxy
   app.post('/api/sigilopay/payment', async (req, res) => {
+    console.log(`[${new Date().toISOString()}] SigiloPay Proxy Request:`, JSON.stringify(req.body, null, 2));
     try {
       let { amount, method, description, userId } = req.body;
       
       if (!userId) {
+        console.error('[SigiloPay Proxy] Error: userId is missing');
         return res.status(400).json({ error: 'userId é obrigatório para registrar o pagamento.' });
       }
 
       // REDIRECIONAMENTO TEMPORÁRIO: Boleto -> PIX
       // Como o Boleto está retornando "No acquirer found", forçamos PIX para não perder a venda.
       if (method === 'boleto') {
-        console.log('Temporary Redirect: Boleto requested, forcing PIX generation.');
+        console.log('[SigiloPay Proxy] Temporary Redirect: Boleto requested, forcing PIX generation.');
         method = 'pix';
       }
       const secretKey = process.env.SIGILOPAY_SECRET_KEY;
       const publicKey = process.env.SIGILOPAY_PUBLIC_KEY;
 
       if (!secretKey || !publicKey) {
-        console.error('SigiloPay credentials missing in environment. Keys found:', { 
-          hasSecret: !!secretKey, 
-          hasPublic: !!publicKey 
-        });
+        console.error('[SigiloPay Proxy] SigiloPay credentials missing in environment.');
         return res.status(500).json({ error: 'Configuração do SigiloPay incompleta no servidor.' });
       }
 
@@ -256,25 +255,25 @@ async function startServer() {
         ],
         metadata: {
           origin: 'EmpireCred App',
-          internalId: `loan-${Date.now()}`
+          internalId: `loan-${Date.now()}`,
+          userId: userId // Adicionando userId no metadata para facilitar recuperação no webhook
         },
         callbackurl: `${process.env.APP_URL || 'https://empirecred.com'}/api/webhooks/sigilopay`
       };
 
       // PIX aceita uma estrutura mais simples, mas vamos manter o padrão para ambos
       if (method === 'pix') {
-        // Algumas versões da API de PIX preferem description na raiz
         payload.description = description || 'Taxa de Empréstimo';
       }
 
-      console.log('SigiloPay Request Payload:', JSON.stringify(payload, null, 2));
+      console.log('[SigiloPay Proxy] Request Payload:', JSON.stringify(payload, null, 2));
 
       // Escolhe o endpoint baseado no método (pix ou boleto)
       const hostname = 'app.sigilopay.com.br';
       const path = method === 'boleto' ? 'boleto' : 'pix';
       let url = `https://${hostname}/api/v1/gateway/${path}/receive`;
       
-      console.log(`Attempting SigiloPay API (${method}) via: ${url}`);
+      console.log(`[SigiloPay Proxy] Attempting API (${method}) via: ${url}`);
       
       let response;
       try {
@@ -289,12 +288,13 @@ async function startServer() {
           timeout: 20000
         });
       } catch (err: any) {
+        console.error(`[SigiloPay Proxy] API Call Failed: ${err.message}`, err.response?.data);
         if (err.code === 'ENOTFOUND' || err.code === 'EAI_AGAIN') {
-          console.log(`DNS failure for ${hostname}, attempting DoH resolution...`);
+          console.log(`[SigiloPay Proxy] DNS failure for ${hostname}, attempting DoH resolution...`);
           const ip = await resolveDnsOverHttps(hostname);
           if (ip) {
             url = `https://${ip}/api/v1/gateway/${path}/receive`;
-            console.log(`Retrying via IP: ${url}`);
+            console.log(`[SigiloPay Proxy] Retrying via IP: ${url}`);
             response = await axios.post(url, payload, {
               headers: {
                 'Content-Type': 'application/json',
@@ -316,12 +316,12 @@ async function startServer() {
       }
 
       const data = response.data;
-      console.log('SigiloPay API Response:', JSON.stringify(data, null, 2));
+      console.log('[SigiloPay Proxy] API Response:', JSON.stringify(data, null, 2));
 
-      // Captura o ID da transação no SigiloPay (ajuste conforme a resposta real da API)
+      // Captura o ID da transação no SigiloPay
       const externalId = data.order?.id || data.id || `ext-${Date.now()}`;
 
-      // Salvar o pagamento no Firestore usando o Client SDK
+      // Salvar o pagamento no Firestore
       try {
         await addDoc(collection(db, 'payments'), {
           userId,
@@ -333,28 +333,22 @@ async function startServer() {
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         });
-        console.log("Payment record saved to Firestore.");
+        console.log(`[SigiloPay Proxy] Payment record saved to Firestore for user ${userId}.`);
       } catch (fsErr) {
-        console.error("Error saving payment to Firestore (non-blocking):", fsErr);
-        // Não bloqueamos a resposta se apenas o log no banco falhar
+        console.error("[SigiloPay Proxy] Error saving payment to Firestore:", fsErr);
       }
 
       // Mapeamento robusto baseado no projeto de referência
       const pixData = data.pix || {};
       const orderData = data.order || {};
       
-      // Captura o código copia e cola
       const pixCode = pixData.code || data.pix_code || data.payload || (typeof data.payload === 'string' ? data.payload : null);
-      
-      // Captura a imagem do QR Code (base64 ou URL)
       let pixQrCode = pixData.base64 || pixData.image || pixData.qr_code || data.encodedImage;
       
-      // CORREÇÃO: Se for base64 puro, adiciona o prefixo de imagem
       if (pixQrCode && typeof pixQrCode === 'string' && !pixQrCode.startsWith('http') && !pixQrCode.startsWith('data:')) {
         pixQrCode = `data:image/png;base64,${pixQrCode}`;
       }
       
-      // Se não vier imagem mas tiver o código, gera um QR Code via API secundária para garantir
       if (!pixQrCode && pixCode) {
         pixQrCode = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(pixCode)}`;
       }
@@ -368,35 +362,36 @@ async function startServer() {
         paymentLink: data.url || orderData.url || data.payment_url || data.checkoutUrl
       };
 
-      console.log('Final Proxy Response:', JSON.stringify(finalResponse, null, 2));
+      console.log('[SigiloPay Proxy] Final Response Sent to Client.');
       return res.json(finalResponse);
 
     } catch (error: any) {
+      console.error('[SigiloPay Proxy] Fatal Error:', error.message);
       const errorMessage = error.response?.data?.message || error.message || 'Erro ao processar pagamento com SigiloPay';
-      const errorDetails = error.response?.data || error.message;
-      console.error('SigiloPay Proxy Error:', errorDetails);
       res.status(error.response?.status || 500).json({ 
         error: errorMessage,
-        details: errorDetails
+        details: error.response?.data || error.message
       });
     }
   });
 
   // SigiloPay Webhook
   app.post('/api/webhooks/sigilopay', async (req, res) => {
-    console.log('SigiloPay Webhook Received:', JSON.stringify(req.body, null, 2));
+    console.error(`[${new Date().toISOString()}] WEBHOOK RECEIVED:`, JSON.stringify(req.body, null, 2));
     
     try {
-      const { status, order_id, id } = req.body;
+      const { status, order_id, id, metadata } = req.body;
       const externalId = order_id || id;
 
-      // Se o status for "paid", "approved" ou similar (depende da API do SigiloPay)
+      console.error(`[Webhook] Processing externalId: ${externalId}, status: ${status}`);
+
+      // Se o status for "paid", "approved" ou similar
       const isPaid = ['paid', 'approved', 'completed', 'success'].includes(String(status).toLowerCase());
 
       if (isPaid && externalId) {
-        console.log(`Payment confirmed for externalId: ${externalId}`);
+        console.error(`[Webhook] Payment confirmed for externalId: ${externalId}`);
         
-        // Buscar o pagamento no Firestore pelo externalId usando o Client SDK
+        // Buscar o pagamento no Firestore
         const paymentsQuery = query(
           collection(db, 'payments'),
           where('externalId', '==', String(externalId)),
@@ -408,13 +403,20 @@ async function startServer() {
           const paymentDoc = paymentsSnapshot.docs[0];
           const paymentData = paymentDoc.data();
 
+          console.error(`[Webhook] Found payment record ${paymentDoc.id} for user ${paymentData.userId}`);
+
+          if (paymentData.status === 'paid') {
+            console.error(`[Webhook] Payment ${paymentDoc.id} already marked as paid. Skipping.`);
+            return res.status(200).send('OK (Already processed)');
+          }
+
           // Atualizar status do pagamento
           await updateDoc(paymentDoc.ref, {
             status: 'paid',
             updatedAt: new Date().toISOString()
           });
 
-          console.log(`Payment document ${paymentDoc.id} updated to paid.`);
+          console.error(`[Webhook] Payment document ${paymentDoc.id} updated to paid.`);
 
           // Se for um depósito, atualiza o saldo do usuário
           if (paymentData.description && paymentData.description.includes('Depósito em conta')) {
@@ -426,10 +428,12 @@ async function startServer() {
                 balance: currentBalance + paymentData.amount,
                 updatedAt: new Date().toISOString()
               });
-              console.log(`User ${paymentData.userId} balance updated: +${paymentData.amount}`);
+              console.error(`[Webhook] User ${paymentData.userId} balance updated: +${paymentData.amount}`);
             }
           }
           
+          // Tentar encontrar uma proposta pendente para este usuário
+          // Importante: O usuário pode ter fechado a aba, então buscamos a proposta mais recente
           const proposalsQuery = query(
             collection(db, 'proposals'),
             where('userId', '==', paymentData.userId),
@@ -444,16 +448,28 @@ async function startServer() {
               status: 'paid',
               updatedAt: new Date().toISOString()
             });
-            console.log(`Proposal ${proposalsSnapshot.docs[0].id} updated to paid.`);
+            console.error(`[Webhook] Proposal ${proposalsSnapshot.docs[0].id} updated to paid.`);
+          } else {
+            console.error(`[Webhook] No pending proposal found for user ${paymentData.userId}.`);
+            // Se não encontrar proposta pendente, talvez devêssemos verificar se há uma proposta recente 
+            // que ainda não foi criada no banco (o que seria um problema de fluxo)
           }
         } else {
-          console.log(`No payment found in Firestore for externalId: ${externalId}`);
+          console.error(`[Webhook] CRITICAL: No payment found in Firestore for externalId: ${externalId}`);
+          
+          // Fallback: Se tivermos userId no metadata, podemos tentar atualizar o usuário diretamente
+          if (metadata && metadata.userId) {
+            console.error(`[Webhook] Attempting fallback with userId from metadata: ${metadata.userId}`);
+            // ... lógica de fallback se necessário ...
+          }
         }
+      } else {
+        console.error(`[Webhook] Payment not paid or no externalId. Status: ${status}`);
       }
 
       res.status(200).send('OK');
-    } catch (error) {
-      console.error('Webhook Error:', error);
+    } catch (error: any) {
+      console.error(`[Webhook] FATAL ERROR: ${error.message}`);
       res.status(500).send('Internal Error');
     }
   });

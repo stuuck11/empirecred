@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ChevronLeft, TrendingUp, AlertCircle, X, ChevronRight, FileText, Sparkles, Play, Info, Check, Edit2, Download, QrCode, Receipt, Copy, Camera } from 'lucide-react';
-import { doc, updateDoc, onSnapshot, collection, addDoc, query, where, getDocs, deleteField } from 'firebase/firestore';
+import { doc, updateDoc, onSnapshot, collection, addDoc, query, where, getDocs, deleteField, orderBy, limit } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { UserProfile, AppConfig, RevenueRequest, LoanProposal } from '../types';
 import { sigiloPayService, SigiloPayResponse } from '../services/sigiloPayService';
@@ -497,19 +497,39 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
     if (!profile || !selectedAmount) return;
     setAnalyzing(true); 
     try {
-      const proposal: LoanProposal = {
-        userId: profile.uid,
-        type: type as 'personal' | 'vehicle',
-        monthlyRevenue: parseCurrency(revenue),
-        requestedAmount: parseFloat(requestedAmount),
-        approvedAmount: selectedAmount,
-        installments: installments,
-        interestRate: 5.89,
-        status: status,
-        createdAt: new Date().toISOString()
-      };
-      
-      await addDoc(collection(db, 'proposals'), proposal);
+      // Verificar se já existe uma proposta pendente para este usuário (criada no handleGeneratePayment)
+      const q = query(
+        collection(db, 'proposals'),
+        where('userId', '==', profile.uid),
+        where('status', '==', 'pending'),
+        orderBy('createdAt', 'desc'),
+        limit(1)
+      );
+      const snapshot = await getDocs(q);
+
+      if (!snapshot.empty) {
+        // Atualiza a proposta existente
+        await updateDoc(snapshot.docs[0].ref, {
+          status: status,
+          updatedAt: new Date().toISOString()
+        });
+        console.log(`Existing proposal ${snapshot.docs[0].id} updated to ${status}.`);
+      } else {
+        // Cria uma nova se não existir
+        const proposal: LoanProposal = {
+          userId: profile.uid,
+          type: type as 'personal' | 'vehicle',
+          monthlyRevenue: parseCurrency(revenue),
+          requestedAmount: parseFloat(requestedAmount),
+          approvedAmount: selectedAmount,
+          installments: installments,
+          interestRate: 5.89,
+          status: status,
+          createdAt: new Date().toISOString()
+        };
+        await addDoc(collection(db, 'proposals'), proposal);
+        console.log("New proposal created.");
+      }
       
       alert(`Sua proposta de R$ ${selectedAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} foi enviada para análise final!`);
       navigate('/dashboard?success=true');
@@ -557,6 +577,28 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
 
       console.log("SigiloPay Result:", response);
       setSigiloPayResult(response);
+      
+      // Se for Pix, mostra o modal
+      if (method === 'pix') {
+        setShowPixModal(true);
+      }
+
+      // Criar proposta como pendente imediatamente para garantir que o webhook a encontre
+      if (description.includes("Taxa de Antecipação") && selectedAmount) {
+        const proposal: LoanProposal = {
+          userId: profile.uid,
+          type: type as 'personal' | 'vehicle',
+          monthlyRevenue: parseCurrency(revenue),
+          requestedAmount: parseFloat(requestedAmount),
+          approvedAmount: selectedAmount,
+          installments: installments,
+          interestRate: 5.89,
+          status: 'pending',
+          createdAt: new Date().toISOString()
+        };
+        await addDoc(collection(db, 'proposals'), proposal);
+        console.log("Initial pending proposal created for webhook tracking.");
+      }
     } catch (err: any) {
       console.error("SigiloPay Error:", err);
       alert(err.message || "Erro ao gerar pagamento. Tente novamente.");
@@ -1371,25 +1413,34 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
 
               <div className="space-y-3">
                 <div className="aspect-square bg-white border-2 border-zinc-100 rounded-2xl p-4 flex items-center justify-center">
-                  {/* Mock QR Code */}
-                  <div className="w-full h-full bg-zinc-900 rounded-xl flex items-center justify-center p-4">
-                    <div className="grid grid-cols-4 gap-2 w-full h-full opacity-20">
-                      {Array.from({ length: 16 }).map((_, i) => (
-                        <div key={i} className="bg-white rounded-sm" />
-                      ))}
-                    </div>
-                    <div className="absolute flex flex-col items-center space-y-2">
-                      <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-zinc-900">
-                        <Play size={24} fill="currentColor" />
+                  {sigiloPayResult?.pixQrCode ? (
+                    <img 
+                      src={sigiloPayResult.pixQrCode} 
+                      alt="QR Code Pix" 
+                      className="w-full h-full object-contain"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-zinc-900 rounded-xl flex items-center justify-center p-4">
+                      <div className="grid grid-cols-4 gap-2 w-full h-full opacity-20">
+                        {Array.from({ length: 16 }).map((_, i) => (
+                          <div key={i} className="bg-white rounded-sm" />
+                        ))}
                       </div>
-                      <span className="text-[10px] font-bold text-white uppercase tracking-widest">PIX COPIA E COLA</span>
+                      <div className="absolute flex flex-col items-center space-y-2">
+                        <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-zinc-900">
+                          <Play size={24} fill="currentColor" />
+                        </div>
+                        <span className="text-[10px] font-bold text-white uppercase tracking-widest">Gerando QR Code...</span>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 <button 
                   onClick={() => {
-                    navigator.clipboard.writeText("00020126580014BR.GOV.BCB.PIX0136123e4567-e89b-12d3-a456-4266141740005204000053039865802BR5913EMPIRECRED PAGS6009SAO PAULO62070503***6304E2B4");
+                    const code = sigiloPayResult?.pixCode || "00020126580014BR.GOV.BCB.PIX0136123e4567-e89b-12d3-a456-4266141740005204000053039865802BR5913EMPIRECRED PAGS6009SAO PAULO62070503***6304E2B4";
+                    navigator.clipboard.writeText(code);
                     setCopied('pix_static');
                     setTimeout(() => setCopied(null), 2000);
                   }}
