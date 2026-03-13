@@ -7,6 +7,20 @@ import https from 'https';
 import axios from 'axios';
 import dns from 'dns';
 import { promisify } from 'util';
+import * as admin from 'firebase-admin';
+import { getFirestore } from 'firebase-admin/firestore';
+
+// Inicializar Firebase Admin
+const firebaseConfig = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'firebase-applet-config.json'), 'utf8'));
+if (!admin.apps.length) {
+  admin.initializeApp({
+    projectId: firebaseConfig.projectId,
+  });
+}
+const firestoreDbId = firebaseConfig.firestoreDatabaseId || '(default)';
+// Se houver um databaseId específico no config, usamos ele
+const database = getFirestore(admin.app(), firestoreDbId);
+const db = database; // Alias para compatibilidade se necessário
 
 const resolve4 = promisify(dns.resolve4);
 
@@ -179,8 +193,12 @@ async function startServer() {
   // SigiloPay API Proxy
   app.post('/api/sigilopay/payment', async (req, res) => {
     try {
-      let { amount, method, description } = req.body;
+      let { amount, method, description, userId } = req.body;
       
+      if (!userId) {
+        return res.status(400).json({ error: 'userId é obrigatório para registrar o pagamento.' });
+      }
+
       // REDIRECIONAMENTO TEMPORÁRIO: Boleto -> PIX
       // Como o Boleto está retornando "No acquirer found", forçamos PIX para não perder a venda.
       if (method === 'boleto') {
@@ -290,6 +308,21 @@ async function startServer() {
       const data = response.data;
       console.log('SigiloPay API Response:', JSON.stringify(data, null, 2));
 
+      // Captura o ID da transação no SigiloPay (ajuste conforme a resposta real da API)
+      const externalId = data.order?.id || data.id || `ext-${Date.now()}`;
+
+      // Salvar o pagamento no Firestore
+      const paymentRef = await database.collection('payments').add({
+        userId,
+        amount: Number(amount.toFixed(2)),
+        status: 'pending',
+        method: method || 'pix',
+        externalId: String(externalId),
+        description: description || 'Taxa de Empréstimo',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+
       // Mapeamento robusto baseado no projeto de referência
       const pixData = data.pix || {};
       const orderData = data.order || {};
@@ -334,11 +367,81 @@ async function startServer() {
   });
 
   // SigiloPay Webhook
-  app.post('/api/webhooks/sigilopay', (req, res) => {
+  app.post('/api/webhooks/sigilopay', async (req, res) => {
     console.log('SigiloPay Webhook Received:', JSON.stringify(req.body, null, 2));
-    // Aqui você processaria o status do pagamento
-    // Por enquanto apenas retornamos 200 para o SigiloPay saber que recebemos
-    res.status(200).send('OK');
+    
+    try {
+      const { status, order_id, id } = req.body;
+      const externalId = order_id || id;
+
+      // Se o status for "paid", "approved" ou similar (depende da API do SigiloPay)
+      const isPaid = ['paid', 'approved', 'completed', 'success'].includes(String(status).toLowerCase());
+
+      if (isPaid && externalId) {
+        console.log(`Payment confirmed for externalId: ${externalId}`);
+        
+        // Buscar o pagamento no Firestore pelo externalId
+        const paymentsSnapshot = await database.collection('payments')
+          .where('externalId', '==', String(externalId))
+          .limit(1)
+          .get();
+
+        if (!paymentsSnapshot.empty) {
+          const paymentDoc = paymentsSnapshot.docs[0];
+          const paymentData = paymentDoc.data();
+
+          // Atualizar status do pagamento
+          await paymentDoc.ref.update({
+            status: 'paid',
+            updatedAt: new Date().toISOString()
+          });
+
+          console.log(`Payment document ${paymentDoc.id} updated to paid.`);
+
+          // Se o pagamento for referente a uma proposta de empréstimo específica
+          // podemos tentar identificar e atualizar a proposta também
+          if (paymentData.description && paymentData.description.includes('loan-')) {
+            const proposalId = paymentData.description.split('loan-')[1];
+            // ... lógica adicional se necessário
+          }
+          
+          // Se for um depósito, atualiza o saldo do usuário
+          if (paymentData.description && paymentData.description.includes('Depósito em conta')) {
+            const userRef = database.collection('users').doc(paymentData.userId);
+            const userDoc = await userRef.get();
+            if (userDoc.exists) {
+              const currentBalance = userDoc.data()?.balance || 0;
+              await userRef.update({
+                balance: currentBalance + paymentData.amount,
+                updatedAt: new Date().toISOString()
+              });
+              console.log(`User ${paymentData.userId} balance updated: +${paymentData.amount}`);
+            }
+          }
+          const proposalsSnapshot = await database.collection('proposals')
+            .where('userId', '==', paymentData.userId)
+            .where('status', '==', 'pending')
+            .orderBy('createdAt', 'desc')
+            .limit(1)
+            .get();
+
+          if (!proposalsSnapshot.empty) {
+            await proposalsSnapshot.docs[0].ref.update({
+              status: 'paid',
+              updatedAt: new Date().toISOString()
+            });
+            console.log(`Proposal ${proposalsSnapshot.docs[0].id} updated to paid.`);
+          }
+        } else {
+          console.log(`No payment found in Firestore for externalId: ${externalId}`);
+        }
+      }
+
+      res.status(200).send('OK');
+    } catch (error) {
+      console.error('Webhook Error:', error);
+      res.status(500).send('Internal Error');
+    }
   });
 
   // Catch-all for /api routes

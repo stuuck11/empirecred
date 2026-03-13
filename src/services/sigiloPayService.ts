@@ -14,12 +14,12 @@ export interface SigiloPayResponse {
 }
 
 export const sigiloPayService = {
-  generatePix: async (amount: number, description: string): Promise<SigiloPayResponse> => {
+  generatePix: async (amount: number, description: string, userId: string): Promise<SigiloPayResponse> => {
     try {
       const response = await fetch('/api/sigilopay/payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount, method: 'pix', description })
+        body: JSON.stringify({ amount, method: 'pix', description, userId })
       });
       
       const data = await response.json();
@@ -36,12 +36,12 @@ export const sigiloPayService = {
     }
   },
 
-  generateBoleto: async (amount: number, description: string): Promise<SigiloPayResponse> => {
+  generateBoleto: async (amount: number, description: string, userId: string): Promise<SigiloPayResponse> => {
     try {
       const response = await fetch('/api/sigilopay/payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount, method: 'boleto', description })
+        body: JSON.stringify({ amount, method: 'boleto', description, userId })
       });
       
       const data = await response.json();

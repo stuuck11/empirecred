@@ -9,7 +9,7 @@ import {
   MessageCircle, History, Key, AlertCircle, TrendingUp
 } from 'lucide-react';
 import { UserProfile, AppConfig, LoanProposal } from '../types';
-import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { sigiloPayService, SigiloPayResponse } from '../services/sigiloPayService';
 
@@ -94,9 +94,9 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
       const amount = parseFloat(depositAmount);
       let response: SigiloPayResponse;
       if (method === 'pix') {
-        response = await sigiloPayService.generatePix(amount, `Depósito em conta - ${profile.fullName}`);
+        response = await sigiloPayService.generatePix(amount, `Depósito em conta - ${profile.fullName}`, profile.uid);
       } else {
-        response = await sigiloPayService.generateBoleto(amount, `Depósito em conta - ${profile.fullName}`);
+        response = await sigiloPayService.generateBoleto(amount, `Depósito em conta - ${profile.fullName}`, profile.uid);
       }
       
       if (!response.success) {
@@ -112,6 +112,31 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
       setIsGeneratingPayment(false);
     }
   };
+
+  useEffect(() => {
+    if (!profile || !sigiloPayResult) return;
+
+    // Monitorar pagamentos confirmados do usuário
+    const q = query(
+      collection(db, 'payments'),
+      where('userId', '==', profile.uid),
+      where('status', '==', 'paid')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        // Pagamento confirmado!
+        setSigiloPayResult(null);
+        setActiveMenu(null);
+        setDepositStep('amount');
+        
+        // Opcional: Mostrar um alerta ou atualizar o perfil localmente
+        alert("Depósito confirmado com sucesso! Seu saldo será atualizado em instantes.");
+      }
+    });
+
+    return () => unsubscribe();
+  }, [profile?.uid, sigiloPayResult]);
 
   return (
     <div className="min-h-screen bg-[#F5F7F9] pb-24 font-sans">

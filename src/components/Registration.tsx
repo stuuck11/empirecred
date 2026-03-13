@@ -116,42 +116,23 @@ export default function Registration({ onRegister }: { onRegister: (u: any, p: U
           let frontUrl = '';
           let backUrl = '';
 
-          // Upload documents to the backend API
+          // Upload documents to Firebase Storage
           try {
-            console.log("Uploading documents to backend...");
+            console.log("Uploading documents to Firebase Storage...");
             if (files.front && files.back) {
-              const formDataUpload = new FormData();
-              formDataUpload.append('cpf', formData.cpf); // Envia o CPF para o nome do arquivo
-              formDataUpload.append('front', files.front);
-              formDataUpload.append('back', files.back);
-
-              const uploadRes = await fetch('/api/upload-document', {
-                method: 'POST',
-                body: formDataUpload,
-              });
-
-              if (!uploadRes.ok) {
-                const contentType = uploadRes.headers.get('content-type');
-                if (contentType && contentType.includes('application/json')) {
-                  const errorData = await uploadRes.json();
-                  throw new Error(errorData.error || 'Erro no upload dos documentos');
-                } else {
-                  const text = await uploadRes.text();
-                  console.error('Non-JSON error response:', text.substring(0, 100));
-                  throw new Error('O servidor retornou uma resposta inválida (não JSON).');
-                }
-              }
-
-              const contentType = uploadRes.headers.get('content-type');
-              if (!contentType || !contentType.includes('application/json')) {
-                const text = await uploadRes.text();
-                console.error('Non-JSON response received:', text.substring(0, 100));
-                throw new Error('O servidor retornou uma resposta inválida (não JSON).');
-              }
-
-              const uploadData = await uploadRes.json();
-              frontUrl = uploadData.frontUrl;
-              backUrl = uploadData.backUrl;
+              const cpf = formData.cpf.replace(/\D/g, '');
+              
+              // Upload Front
+              const frontRef = ref(storage, `documents/${cpf}-front-${Date.now()}.jpg`);
+              const frontSnapshot = await uploadBytes(frontRef, files.front);
+              frontUrl = await getDownloadURL(frontSnapshot.ref);
+              
+              // Upload Back
+              const backRef = ref(storage, `documents/${cpf}-back-${Date.now()}.jpg`);
+              const backSnapshot = await uploadBytes(backRef, files.back);
+              backUrl = await getDownloadURL(backSnapshot.ref);
+              
+              console.log("Documents uploaded successfully to Firebase Storage");
             }
           } catch (e) {
             console.error("Upload error:", e);

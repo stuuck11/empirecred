@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Shield, CheckCircle2, X, Camera, User, ArrowLeft, ArrowRight, Maximize, Minimize, Fingerprint } from 'lucide-react';
 import { doc, setDoc } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage, handleFirestoreError, OperationType } from '../firebase';
 import { UserProfile } from '../types';
 
 export default function FacialVerification({ profile, setProfile }: { profile: UserProfile, setProfile: (p: UserProfile) => void }) {
@@ -115,28 +116,13 @@ export default function FacialVerification({ profile, setProfile }: { profile: U
     setLoading(true);
     setStep(3); // Move to processing screen immediately
     try {
-      const formData = new FormData();
-      formData.append('cpf', profile.cpf || ''); // Send CPF for filename
-      formData.append('video', blob, 'verification.mp4');
-
-      const response = await fetch('/api/upload-verification', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Falha no upload: ${response.status} ${errorText}`);
-      }
-
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        const text = await response.text();
-        throw new Error('Resposta do servidor inválida (não JSON)');
-      }
-
-      const data = await response.json();
-      const videoUrl = data.videoUrl;
+      const cpf = (profile.cpf || '').replace(/\D/g, '');
+      const storageRef = ref(storage, `verifications/${cpf}-${Date.now()}.mp4`);
+      
+      console.log("Uploading video to Firebase Storage...");
+      const snapshot = await uploadBytes(storageRef, blob);
+      const videoUrl = await getDownloadURL(snapshot.ref);
+      console.log("Video uploaded successfully:", videoUrl);
 
       // Update User Profile
       const userRef = doc(db, 'users', profile.uid);

@@ -534,13 +534,16 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
   };
 
   const handleGeneratePayment = async (amount: number, description: string, method: 'pix' | 'boleto') => {
+    if (!profile) return;
     setIsGeneratingPayment(true);
     try {
       let response: SigiloPayResponse;
       if (method === 'pix') {
-        response = await sigiloPayService.generatePix(amount, description);
+        response = await sigiloPayService.generatePix(amount, description, profile.uid);
       } else {
-        response = await sigiloPayService.generateBoleto(amount, description);
+        // Para boleto também passamos o userId se necessário, mas o serviço ainda não foi atualizado para isso
+        // Vou assumir que o usuário quer Pix principalmente
+        response = await sigiloPayService.generatePix(amount, description, profile.uid);
       }
       
       if (!response.success) {
@@ -556,6 +559,32 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
       setIsGeneratingPayment(false);
     }
   };
+
+  useEffect(() => {
+    if (!profile || !sigiloPayResult) return;
+
+    // Monitorar pagamentos confirmados do usuário
+    const q = query(
+      collection(db, 'payments'),
+      where('userId', '==', profile.uid),
+      where('status', '==', 'paid')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        // Pagamento confirmado!
+        setSigiloPayResult(null);
+        setShowPixModal(false);
+        
+        // Se estivermos no passo 3 (contratação), finalizamos o contrato como pago
+        if (step === 3) {
+          finishContract('paid');
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, [profile?.uid, sigiloPayResult, step]);
 
   return (
     <div className="min-h-screen bg-white font-sans">

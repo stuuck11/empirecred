@@ -37,6 +37,22 @@
         },
         "creditBannerUrl": { "type": "string" }
       }
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "Records of payments generated and their status.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "paid", "expired", "refunded"] },
+        "method": { "type": "string" },
+        "externalId": { "type": "string", "description": "ID from the payment provider" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "amount", "status", "method", "createdAt"]
     }
   },
   "firestore": {
@@ -47,6 +63,10 @@
     "/config/app": {
       "schema": "AppConfig",
       "description": "Global application configuration."
+    },
+    "/payments/{paymentId}": {
+      "schema": "Payment",
+      "description": "Payment records."
     }
   }
 }
