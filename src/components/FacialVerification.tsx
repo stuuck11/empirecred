@@ -20,6 +20,7 @@ export default function FacialVerification({ profile, setProfile }: { profile: U
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const instructionData = [
     { text: "Centralize seu rosto", icon: <User size={24} /> },
@@ -28,6 +29,12 @@ export default function FacialVerification({ profile, setProfile }: { profile: U
     { text: "Vire para a esquerda", icon: <ArrowLeft size={24} /> },
     { text: "Vire para a direita", icon: <ArrowRight size={24} /> }
   ];
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await uploadVideo(file);
+  };
 
   useEffect(() => {
     let interval: any;
@@ -122,7 +129,8 @@ export default function FacialVerification({ profile, setProfile }: { profile: U
     try {
       const formData = new FormData();
       formData.append('cpf', profile.cpf || ''); // Send CPF for filename
-      formData.append('video', blob, 'verification.mp4');
+      const filename = blob instanceof File ? blob.name : 'verification.mp4';
+      formData.append('video', blob, filename);
 
       const response = await fetch('/api/upload-verification', {
         method: 'POST',
@@ -235,6 +243,21 @@ export default function FacialVerification({ profile, setProfile }: { profile: U
                 className="w-full bg-emerald-500 text-white py-4 rounded-2xl font-bold shadow-xl shadow-emerald-500/20"
               >
                 Iniciar Verificação
+              </button>
+              
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleFileUpload} 
+                accept="image/*" 
+                className="hidden" 
+              />
+              
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full bg-zinc-800 text-zinc-300 py-4 rounded-2xl font-bold border border-zinc-700"
+              >
+                Anexar Foto
               </button>
             </div>
           </motion.div>

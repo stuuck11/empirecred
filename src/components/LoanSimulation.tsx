@@ -440,7 +440,8 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
       const iof = amount * 0.0289;
       const iss = amount * 0.031;
       const cet = amount * 0.0349;
-      return iof + iss + cet;
+      const total = iof + iss + cet;
+      return Math.max(total, 96.95);
     } else {
       // Taxa aleatória entre 940 e 970
       return Math.floor(Math.random() * (970 - 940 + 1)) + 940;
