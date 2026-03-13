@@ -372,6 +372,7 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
   const [error, setError] = useState('');
   const [sigiloPayResult, setSigiloPayResult] = useState<SigiloPayResponse | null>(null);
   const [isGeneratingPayment, setIsGeneratingPayment] = useState(false);
+  const [paymentDescription, setPaymentDescription] = useState('');
   const [copied, setCopied] = useState<string | null>(null);
 
   const [vehicleData, setVehicleData] = useState({ brand: '', model: '', year: '', value: '' });
@@ -561,6 +562,7 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
   const handleGeneratePayment = async (amount: number, description: string, method: 'pix' | 'boleto') => {
     if (!profile) return;
     setIsGeneratingPayment(true);
+    setPaymentDescription(description);
     try {
       let response: SigiloPayResponse;
       if (method === 'pix') {
@@ -1504,7 +1506,9 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
                 
                 <div className="space-y-1">
                   <h4 className="font-bold text-zinc-900">Pagamento Gerado</h4>
-                  <p className="text-xs text-zinc-500">Use os dados abaixo para realizar o pagamento da sua parcela de forma segura.</p>
+                  <p className="text-xs text-zinc-500">
+                    Use os dados abaixo para realizar o pagamento da sua {paymentDescription.toLowerCase().includes('parcela') ? 'parcela' : 'taxa de antecipação'} de forma segura.
+                  </p>
                   {sigiloPayResult.amount && (
                     <div className="mt-2 py-1.5 px-4 bg-emerald-50 text-[#008542] rounded-full inline-block font-bold text-base">
                       Valor: R$ {sigiloPayResult.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
