@@ -11,6 +11,7 @@ import {
 import { UserProfile, AppConfig, LoanProposal } from '../types';
 import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
+import { sigiloPayService, SigiloPayResponse } from '../services/sigiloPayService';
 
 export default function Dashboard({ profile, onLogout, setProfile }: { profile: UserProfile, onLogout: () => void, setProfile: (p: UserProfile) => void }) {
   const navigate = useNavigate();
@@ -39,6 +40,9 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
   const [depositAmount, setDepositAmount] = useState('');
   const [depositMethod, setDepositMethod] = useState<'pix' | 'boleto' | null>(null);
   const [depositStep, setDepositStep] = useState<'amount' | 'method' | 'result'>('amount');
+  const [sigiloPayResult, setSigiloPayResult] = useState<SigiloPayResponse | null>(null);
+  const [isGeneratingPayment, setIsGeneratingPayment] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchConfig = async () => {
@@ -81,6 +85,32 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
 
   const handleNavigateToLoan = () => {
     navigate('/simulate');
+  };
+
+  const handleGenerateDeposit = async (method: 'pix' | 'boleto') => {
+    setIsGeneratingPayment(true);
+    setDepositMethod(method);
+    try {
+      const amount = parseFloat(depositAmount);
+      let response: SigiloPayResponse;
+      if (method === 'pix') {
+        response = await sigiloPayService.generatePix(amount, `Depósito em conta - ${profile.fullName}`);
+      } else {
+        response = await sigiloPayService.generateBoleto(amount, `Depósito em conta - ${profile.fullName}`);
+      }
+      
+      if (!response.success) {
+        throw new Error(response.error || "Erro ao gerar pagamento");
+      }
+
+      setSigiloPayResult(response);
+      setDepositStep('result');
+    } catch (err: any) {
+      console.error("SigiloPay Error:", err);
+      alert(err.message || "Erro ao gerar pagamento. Tente novamente.");
+    } finally {
+      setIsGeneratingPayment(false);
+    }
   };
 
   return (
@@ -308,6 +338,21 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
       </nav>
 
       {/* Modals / Menus */}
+      <AnimatePresence>
+        {isGeneratingPayment && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
+            <div className="bg-white p-8 rounded-3xl shadow-2xl flex flex-col items-center space-y-4">
+              <motion.div 
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                className="w-10 h-10 border-4 border-[#008542] border-t-transparent rounded-full"
+              />
+              <p className="text-sm font-bold text-zinc-900">Gerando cobrança segura...</p>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
       <AnimatePresence>
         {activeMenu === 'pix' && (
           <div className="fixed inset-0 z-[100] bg-white">
@@ -542,10 +587,7 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
                   <p className="text-sm text-zinc-500">Escolha a forma de depósito:</p>
                   <div className="space-y-3">
                     <button 
-                      onClick={() => {
-                        setDepositMethod('pix');
-                        setDepositStep('result');
-                      }}
+                      onClick={() => handleGenerateDeposit('pix')}
                       className="w-full p-6 bg-zinc-50 rounded-2xl border border-zinc-100 flex items-center space-x-4 hover:bg-zinc-100 transition-colors"
                     >
                       <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-[#008542]">
@@ -558,10 +600,7 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
                     </button>
 
                     <button 
-                      onClick={() => {
-                        setDepositMethod('boleto');
-                        setDepositStep('result');
-                      }}
+                      onClick={() => handleGenerateDeposit('boleto')}
                       className="w-full p-6 bg-zinc-50 rounded-2xl border border-zinc-100 flex items-center space-x-4 hover:bg-zinc-100 transition-colors"
                     >
                       <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-[#008542]">
@@ -590,15 +629,78 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
                   <div className="bg-zinc-50 p-6 rounded-2xl border border-zinc-100">
                     {depositMethod === 'pix' ? (
                       <div className="space-y-4">
-                        <div className="w-32 h-32 bg-zinc-900 rounded-xl mx-auto flex items-center justify-center opacity-20">
-                          <QrCode size={64} className="text-white" />
-                        </div>
-                        <button className="text-[#008542] text-xs font-bold uppercase tracking-widest">Copiar Código Pix</button>
+                        {sigiloPayResult?.pixQrCode ? (
+                          <div className="w-48 h-48 bg-white rounded-2xl mx-auto p-2 border-2 border-zinc-100">
+                            <img src={sigiloPayResult.pixQrCode} alt="QR Code Pix" className="w-full h-full object-contain" />
+                          </div>
+                        ) : (
+                          <div className="w-32 h-32 bg-zinc-900 rounded-xl mx-auto flex items-center justify-center opacity-20">
+                            <QrCode size={64} className="text-white" />
+                          </div>
+                        )}
+                        <button 
+                          onClick={() => {
+                            if (sigiloPayResult?.pixCode) {
+                              navigator.clipboard.writeText(sigiloPayResult.pixCode);
+                              setCopied('pix');
+                              setTimeout(() => setCopied(null), 2000);
+                            }
+                          }}
+                          className="text-[#008542] text-xs font-bold uppercase tracking-widest relative"
+                        >
+                          <AnimatePresence>
+                            {copied === 'pix' && (
+                              <motion.div 
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                className="absolute -top-8 left-1/2 -translate-x-1/2 bg-zinc-900 text-white px-3 py-1 rounded-full text-[10px]"
+                              >
+                                Copiado!
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                          Copiar Código Pix
+                        </button>
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        <p className="font-mono text-xs text-zinc-600 break-all">34191.79001 01043.510047 91020.150008 1 964300000{depositAmount.replace('.', '')}</p>
-                        <button className="text-[#008542] text-xs font-bold uppercase tracking-widest">Copiar Código de Barras</button>
+                        <p className="font-mono text-xs text-zinc-600 break-all">
+                          {sigiloPayResult?.barcode || `34191.79001 01043.510047 91020.150008 1 964300000${depositAmount.replace('.', '')}`}
+                        </p>
+                        <button 
+                          onClick={() => {
+                            const code = sigiloPayResult?.barcode || `34191.79001 01043.510047 91020.150008 1 964300000${depositAmount.replace('.', '')}`;
+                            navigator.clipboard.writeText(code);
+                            setCopied('boleto');
+                            setTimeout(() => setCopied(null), 2000);
+                          }}
+                          className="text-[#008542] text-xs font-bold uppercase tracking-widest relative"
+                        >
+                          <AnimatePresence>
+                            {copied === 'boleto' && (
+                              <motion.div 
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                className="absolute -top-8 left-1/2 -translate-x-1/2 bg-zinc-900 text-white px-3 py-1 rounded-full text-[10px]"
+                              >
+                                Copiado!
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                          Copiar Código de Barras
+                        </button>
+                        {sigiloPayResult?.paymentLink && (
+                          <a 
+                            href={sigiloPayResult.paymentLink} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="block w-full bg-emerald-500 text-white py-3 rounded-xl text-xs font-bold uppercase tracking-widest"
+                          >
+                            Visualizar Boleto
+                          </a>
+                        )}
                       </div>
                     )}
                   </div>

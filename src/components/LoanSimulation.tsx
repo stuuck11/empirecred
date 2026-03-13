@@ -416,8 +416,8 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
     setTimeout(() => {
       setAnalyzing(false);
       
-      // Se a renda for >= 8000, permitir até 20000. Caso contrário, 80% da renda.
-      const maxAllowedReq = rev >= 8000 ? 20000 : rev * 0.8;
+      // Se a renda for >= 8000, permitir até 20000. Caso contrário, 125% da renda.
+      const maxAllowedReq = rev >= 8000 ? 20000 : rev * 1.25;
       
       if (req > maxAllowedReq) {
         setOffer({ approved: false, amount: 0 });
@@ -1261,7 +1261,7 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
                         />
                       </div>
                       <span className="text-xs text-zinc-500 leading-relaxed group-hover:text-zinc-700 transition-colors">
-                        Li e concordo com os <a href="https://empirecred.com/termos" target="_blank" rel="noopener noreferrer" className="text-emerald-600 underline font-bold">Termos de Uso</a> e as condições do contrato de empréstimo.
+                        Li e concordo com os <a href="https://ae3tecnologia.com.br/lgpd/termo-de-uso" target="_blank" rel="noopener noreferrer" className="text-emerald-600 underline font-bold">Termos de Uso</a> e as condições do contrato de empréstimo.
                       </span>
                     </label>
                   </div>

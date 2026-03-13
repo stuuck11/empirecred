@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { ChevronRight, Camera, Check, MapPin, User, FileText, Mail, Phone } from 'lucide-react';
-import { createUserWithEmailAndPassword, sendEmailVerification, signOut } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signOut } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { auth, db, storage, handleFirestoreError, OperationType } from '../firebase';
@@ -105,7 +105,6 @@ export default function Registration({ onRegister }: { onRegister: (u: any, p: U
         console.log("Creating Auth user...");
         const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
         user = userCredential.user;
-        await sendEmailVerification(user).catch(e => console.error("Email verification error", e));
       }
       const uid = user.uid;
 

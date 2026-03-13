@@ -137,9 +137,7 @@ export default function App() {
     <Router>
       <PageLoader />
       <div className="min-h-screen bg-zinc-50 text-zinc-900 font-sans">
-        {user && !isEmailVerified ? (
-          <EmailVerification user={user} onVerified={() => setIsEmailVerified(true)} />
-        ) : user && profile && profile.fullName && !pinVerified ? (
+        {user && profile && profile.fullName && !pinVerified ? (
           <PinScreen profile={profile} onVerified={() => setPinVerified(true)} onLogout={logoutLocal} />
         ) : (
           <Routes>
