@@ -7,19 +7,26 @@ import https from 'https';
 import axios from 'axios';
 import dns from 'dns';
 import { promisify } from 'util';
-import { initializeApp, getApps, getApp } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import { initializeApp } from 'firebase/app';
+import { 
+  getFirestore, 
+  collection, 
+  addDoc, 
+  query, 
+  where, 
+  getDocs, 
+  doc, 
+  getDoc, 
+  updateDoc, 
+  orderBy, 
+  limit 
+} from 'firebase/firestore';
 
-// Inicializar Firebase Admin
+// Inicializar Firebase
 const firebaseConfig = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'firebase-applet-config.json'), 'utf8'));
-const app = getApps().length === 0 
-  ? initializeApp({ projectId: firebaseConfig.projectId })
-  : getApp();
-
-const firestoreDbId = firebaseConfig.firestoreDatabaseId || '(default)';
-// Se houver um databaseId específico no config, usamos ele
-const database = getFirestore(app, firestoreDbId);
-const db = database; // Alias para compatibilidade se necessário
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp);
+const database = db; // Alias para compatibilidade
 
 const resolve4 = promisify(dns.resolve4);
 
@@ -314,17 +321,23 @@ async function startServer() {
       // Captura o ID da transação no SigiloPay (ajuste conforme a resposta real da API)
       const externalId = data.order?.id || data.id || `ext-${Date.now()}`;
 
-      // Salvar o pagamento no Firestore
-      const paymentRef = await database.collection('payments').add({
-        userId,
-        amount: Number(amount.toFixed(2)),
-        status: 'pending',
-        method: method || 'pix',
-        externalId: String(externalId),
-        description: description || 'Taxa de Empréstimo',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      });
+      // Salvar o pagamento no Firestore usando o Client SDK
+      try {
+        await addDoc(collection(db, 'payments'), {
+          userId,
+          amount: Number(amount.toFixed(2)),
+          status: 'pending',
+          method: method || 'pix',
+          externalId: String(externalId),
+          description: description || 'Taxa de Empréstimo',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+        console.log("Payment record saved to Firestore.");
+      } catch (fsErr) {
+        console.error("Error saving payment to Firestore (non-blocking):", fsErr);
+        // Não bloqueamos a resposta se apenas o log no banco falhar
+      }
 
       // Mapeamento robusto baseado no projeto de referência
       const pixData = data.pix || {};
@@ -383,53 +396,51 @@ async function startServer() {
       if (isPaid && externalId) {
         console.log(`Payment confirmed for externalId: ${externalId}`);
         
-        // Buscar o pagamento no Firestore pelo externalId
-        const paymentsSnapshot = await database.collection('payments')
-          .where('externalId', '==', String(externalId))
-          .limit(1)
-          .get();
+        // Buscar o pagamento no Firestore pelo externalId usando o Client SDK
+        const paymentsQuery = query(
+          collection(db, 'payments'),
+          where('externalId', '==', String(externalId)),
+          limit(1)
+        );
+        const paymentsSnapshot = await getDocs(paymentsQuery);
 
         if (!paymentsSnapshot.empty) {
           const paymentDoc = paymentsSnapshot.docs[0];
           const paymentData = paymentDoc.data();
 
           // Atualizar status do pagamento
-          await paymentDoc.ref.update({
+          await updateDoc(paymentDoc.ref, {
             status: 'paid',
             updatedAt: new Date().toISOString()
           });
 
           console.log(`Payment document ${paymentDoc.id} updated to paid.`);
 
-          // Se o pagamento for referente a uma proposta de empréstimo específica
-          // podemos tentar identificar e atualizar a proposta também
-          if (paymentData.description && paymentData.description.includes('loan-')) {
-            const proposalId = paymentData.description.split('loan-')[1];
-            // ... lógica adicional se necessário
-          }
-          
           // Se for um depósito, atualiza o saldo do usuário
           if (paymentData.description && paymentData.description.includes('Depósito em conta')) {
-            const userRef = database.collection('users').doc(paymentData.userId);
-            const userDoc = await userRef.get();
-            if (userDoc.exists) {
+            const userRef = doc(db, 'users', paymentData.userId);
+            const userDoc = await getDoc(userRef);
+            if (userDoc.exists()) {
               const currentBalance = userDoc.data()?.balance || 0;
-              await userRef.update({
+              await updateDoc(userRef, {
                 balance: currentBalance + paymentData.amount,
                 updatedAt: new Date().toISOString()
               });
               console.log(`User ${paymentData.userId} balance updated: +${paymentData.amount}`);
             }
           }
-          const proposalsSnapshot = await database.collection('proposals')
-            .where('userId', '==', paymentData.userId)
-            .where('status', '==', 'pending')
-            .orderBy('createdAt', 'desc')
-            .limit(1)
-            .get();
+          
+          const proposalsQuery = query(
+            collection(db, 'proposals'),
+            where('userId', '==', paymentData.userId),
+            where('status', '==', 'pending'),
+            orderBy('createdAt', 'desc'),
+            limit(1)
+          );
+          const proposalsSnapshot = await getDocs(proposalsQuery);
 
           if (!proposalsSnapshot.empty) {
-            await proposalsSnapshot.docs[0].ref.update({
+            await updateDoc(proposalsSnapshot.docs[0].ref, {
               status: 'paid',
               updatedAt: new Date().toISOString()
             });
