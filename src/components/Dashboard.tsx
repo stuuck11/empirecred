@@ -595,10 +595,10 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
                         className="w-full bg-zinc-50 border-none rounded-2xl py-4 pl-12 pr-5 text-lg font-bold outline-none focus:ring-2 focus:ring-[#008542]"
                       />
                     </div>
-                    <p className="text-[10px] text-zinc-400 font-bold ml-1 uppercase tracking-widest">Valor mínimo: R$ 96,95</p>
+                    <p className="text-[10px] text-zinc-400 font-bold ml-1 uppercase tracking-widest">Valor mínimo: R$ 75,00</p>
                   </div>
                   <button 
-                    disabled={!depositAmount || parseFloat(depositAmount) < 96.95}
+                    disabled={!depositAmount || parseFloat(depositAmount) < 75.00}
                     onClick={() => setDepositStep('method')}
                     className="w-full bg-[#008542] text-white py-4 rounded-2xl font-bold shadow-lg disabled:opacity-50"
                   >

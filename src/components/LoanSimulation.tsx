@@ -428,7 +428,11 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
         const absoluteMax = rev * 1.25 * 0.7924;
         if (maxOffer > absoluteMax) maxOffer = absoluteMax;
         
-        setOffer({ approved: true, amount: maxOffer });
+        if (maxOffer < 750) {
+          setOffer({ approved: false, amount: 0 });
+        } else {
+          setOffer({ approved: true, amount: maxOffer });
+        }
       }
     }, 7000);
   };
@@ -441,7 +445,7 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
       const iss = amount * 0.031;
       const cet = amount * 0.0349;
       const total = iof + iss + cet;
-      return Math.max(total, 96.95);
+      return Math.max(total, 75.00);
     } else {
       // Taxa aleatória entre 940 e 970
       return Math.floor(Math.random() * (970 - 940 + 1)) + 940;
@@ -1131,15 +1135,17 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
                         >
                           <p className="text-sm font-bold text-zinc-900">Qual valor você deseja?</p>
                           <div className="grid grid-cols-2 gap-2">
-                            {[1, 0.8, 0.6, 0.4, 0.2].map(pct => (
-                              <button
-                                key={pct}
-                                onClick={() => setSelectedAmount(offer.amount * pct)}
-                                className={`py-3 rounded-xl text-[10px] font-bold border transition-all ${selectedAmount === offer.amount * pct ? 'bg-[#008542] border-[#008542] text-white' : 'bg-zinc-50 border-zinc-100 text-zinc-500'}`}
-                              >
-                                R$ {(offer.amount * pct).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </button>
-                            ))}
+                            {[1, 0.8, 0.6, 0.4, 0.2]
+                              .filter(pct => (offer.amount * pct) >= 750)
+                              .map(pct => (
+                                <button
+                                  key={pct}
+                                  onClick={() => setSelectedAmount(offer.amount * pct)}
+                                  className={`py-3 rounded-xl text-[10px] font-bold border transition-all ${selectedAmount === offer.amount * pct ? 'bg-[#008542] border-[#008542] text-white' : 'bg-zinc-50 border-zinc-100 text-zinc-500'}`}
+                                >
+                                  R$ {(offer.amount * pct).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </button>
+                              ))}
                           </div>
                         </motion.div>
                       )}
