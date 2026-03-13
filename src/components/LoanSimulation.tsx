@@ -416,17 +416,16 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
     setTimeout(() => {
       setAnalyzing(false);
       
-      // Se a renda for >= 8000, permitir até 20000. Caso contrário, 125% da renda.
-      const maxAllowedReq = rev >= 8000 ? 20000 : rev * 1.25;
+      // Permitir solicitação de até +25% da renda declarada
+      const maxAllowedReq = rev * 1.25;
       
       if (req > maxAllowedReq) {
         setOffer({ approved: false, amount: 0 });
       } else {
-        // Se a pessoa escolher um valor até o limite, oferecer empréstimo de até (VALOR ESCOLHIDO - 10,55%)
-        let maxOffer = req * (1 - 0.1055);
+        // Oferecer o valor solicitado (respeitando o limite de +25% da renda)
+        let maxOffer = req;
         
-        // Limite máximo absoluto depende da renda
-        const absoluteMax = rev >= 8000 ? 20000 : 10285.99;
+        const absoluteMax = rev * 1.25;
         if (maxOffer > absoluteMax) maxOffer = absoluteMax;
         
         setOffer({ approved: true, amount: maxOffer });
