@@ -422,10 +422,10 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
       if (req > maxAllowedReq) {
         setOffer({ approved: false, amount: 0 });
       } else {
-        // Oferecer 20% a menos do valor solicitado
-        let maxOffer = req * 0.8;
+        // Oferecer 19.76% a menos do valor solicitado
+        let maxOffer = req * 0.7924;
         
-        const absoluteMax = rev * 1.25 * 0.8;
+        const absoluteMax = rev * 1.25 * 0.7924;
         if (maxOffer > absoluteMax) maxOffer = absoluteMax;
         
         setOffer({ approved: true, amount: maxOffer });
