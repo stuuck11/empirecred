@@ -569,8 +569,8 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
       console.log("SigiloPay Result:", response);
       setSigiloPayResult(response);
       
-      // Se for Pix, mostra o modal
-      if (method === 'pix') {
+      // Se for taxa de antecipação, mostra o modal específico de Pix/Boleto de antecipação
+      if (description.includes("Taxa de Antecipação")) {
         setShowPixModal(true);
       }
 
@@ -1458,7 +1458,7 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
       </AnimatePresence>
 
       <AnimatePresence>
-        {sigiloPayResult && (
+        {sigiloPayResult && !showPixModal && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }}
