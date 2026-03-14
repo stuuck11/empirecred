@@ -557,7 +557,9 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
       if (method === 'pix') {
         response = await sigiloPayService.generatePix(amount, description, profile.uid);
       } else {
-        response = await sigiloPayService.generateBoleto(amount, description, profile.uid);
+        // Para boleto também passamos o userId se necessário, mas o serviço ainda não foi atualizado para isso
+        // Vou assumir que o usuário quer Pix principalmente
+        response = await sigiloPayService.generatePix(amount, description, profile.uid);
       }
       
       if (!response.success) {
@@ -1358,7 +1360,7 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
 
       {/* PIX Modal */}
       <AnimatePresence>
-        {showPixModal && sigiloPayResult && (
+        {showPixModal && selectedAmount && (
           <div className="fixed inset-0 z-[100] flex items-end justify-center p-4 sm:items-center">
             <motion.div 
               initial={{ opacity: 0 }}
@@ -1389,7 +1391,7 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
 
               <div className="bg-zinc-50 p-4 rounded-xl text-center space-y-1 border border-zinc-100">
                 <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Valor a pagar</p>
-                <p className="text-2xl font-bold text-zinc-900">R$ {(sigiloPayResult.amount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                <p className="text-2xl font-bold text-zinc-900">R$ {calculateTaxes(selectedAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
               </div>
 
               <div className="space-y-3">

@@ -117,6 +117,8 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
   useEffect(() => {
     if (!profile || !sigiloPayResult) return;
 
+    const startTime = new Date().toISOString();
+
     // Monitorar pagamentos confirmados do usuário
     const q = query(
       collection(db, 'payments'),
@@ -125,7 +127,12 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      if (!snapshot.empty) {
+      const hasNewPayment = snapshot.docs.some(doc => {
+        const data = doc.data();
+        return data.updatedAt && data.updatedAt >= startTime;
+      });
+
+      if (hasNewPayment) {
         // Pagamento confirmado!
         setSigiloPayResult(null);
         setActiveMenu(null);
@@ -664,6 +671,13 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
                             <QrCode size={64} className="text-white" />
                           </div>
                         )}
+
+                        {sigiloPayResult?.pixCode && (
+                          <p className="text-[10px] text-zinc-400 font-mono break-all line-clamp-1 opacity-60 px-4">
+                            {sigiloPayResult.pixCode.substring(0, 25)}...{sigiloPayResult.pixCode.substring(sigiloPayResult.pixCode.length - 10)}
+                          </p>
+                        )}
+
                         <button 
                           onClick={() => {
                             if (sigiloPayResult?.pixCode) {
