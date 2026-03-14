@@ -806,66 +806,7 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
           </div>
         )}
 
-        {showSuccessAnimation && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="absolute inset-0 bg-black/80 backdrop-blur-md"
-            />
-            <motion.div 
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="relative w-full max-w-md bg-white rounded-[32px] p-8 text-center space-y-6 overflow-hidden"
-            >
-              <motion.div 
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: "spring", damping: 12, stiffness: 200, delay: 0.2 }}
-                className="w-24 h-24 bg-emerald-100 rounded-full flex items-center justify-center mx-auto text-emerald-600"
-              >
-                <CheckCircle2 size={60} />
-              </motion.div>
-              
-              <div className="space-y-2">
-                <motion.h3 
-                  initial={{ y: 20, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  transition={{ delay: 0.4 }}
-                  className="text-2xl font-bold text-zinc-900"
-                >
-                  Taxa paga com sucesso!
-                </motion.h3>
-                <motion.p 
-                  initial={{ y: 20, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  transition={{ delay: 0.5 }}
-                  className="text-emerald-600 font-bold text-lg"
-                >
-                  Empréstimo aprovado!
-                </motion.p>
-                <motion.p 
-                  initial={{ y: 20, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  transition={{ delay: 0.6 }}
-                  className="text-zinc-500"
-                >
-                  O saldo será liberado na sua conta em até 5 minutos.
-                </motion.p>
-              </div>
 
-              <motion.button
-                initial={{ y: 20, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.8 }}
-                onClick={() => setShowSuccessAnimation(false)}
-                className="w-full bg-zinc-900 text-white py-4 rounded-2xl font-bold shadow-lg"
-              >
-                Entendido
-              </motion.button>
-            </motion.div>
-          </div>
-        )}
 
         {activeMenu === 'help' && (
           <div className="fixed inset-0 z-[100] flex items-end justify-center p-0 sm:p-4 sm:items-center">
