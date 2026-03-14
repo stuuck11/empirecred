@@ -23,7 +23,9 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
       'https://jpcredito.b-cdn.net/banners/banner_1755022693376.png',
       'https://picsum.photos/seed/finance1/800/400'
     ],
-    creditBannerUrl: 'https://picsum.photos/seed/credit/800/400'
+    creditBannerUrl: 'https://picsum.photos/seed/credit/800/400',
+    platformFee: 29.90,
+    autoReleaseTime: 60
   });
 
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -36,6 +38,7 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
   const [proofMessage, setProofMessage] = useState('Envie pelo menos um documento para comprovar seu faturamento.');
   const [proofTime, setProofTime] = useState({ h: '24', m: '00', s: '00' });
   const [confirmRelease, setConfirmRelease] = useState<LoanProposal | null>(null);
+  const processingProposals = React.useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const unsubscribeUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
@@ -177,6 +180,26 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
     });
   }, [revenueRequests, config.revenueAnalysisTime, now]);
 
+  useEffect(() => {
+    const releaseTime = config.autoReleaseTime || 60;
+    if (proposals.length === 0) return;
+    
+    const paidProposals = proposals.filter(p => {
+      if (p.status !== 'paid') return false;
+      const startedAt = new Date(p.updatedAt || p.createdAt).getTime();
+      const expiresAt = startedAt + (releaseTime * 1000);
+      return now.getTime() >= expiresAt;
+    });
+
+    paidProposals.forEach(async (p) => {
+      try {
+        await handleCompleteProposal(p);
+      } catch (error) {
+        console.error("Auto-release error:", error);
+      }
+    });
+  }, [proposals, config.autoReleaseTime, now]);
+
   const formatTimeLeft = (timestamp: string, analysisTime: number, override?: number) => {
     const finalTime = override || analysisTime;
     const startedAt = new Date(timestamp).getTime();
@@ -201,6 +224,8 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
   };
 
   const handleCompleteProposal = async (p: LoanProposal) => {
+    if (!p.id || processingProposals.current.has(p.id)) return;
+    processingProposals.current.add(p.id);
     try {
       await updateDoc(doc(db, 'proposals', p.id!), { status: 'completed' });
       const userRef = doc(db, 'users', p.userId);
@@ -211,6 +236,7 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
       }
       setConfirmRelease(null);
     } catch (error) {
+      processingProposals.current.delete(p.id);
       handleFirestoreError(error, OperationType.UPDATE, `proposals/${p.id}`);
     }
   };
@@ -342,6 +368,25 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
                   type="number" 
                   value={config.revenueAnalysisTime || 60}
                   onChange={e => updateConfig({ revenueAnalysisTime: parseInt(e.target.value) || 0 })}
+                  className="w-full bg-zinc-50 border-none rounded-xl py-3 px-4 text-xs outline-none"
+                />
+              </div>
+              <div className="space-y-2">
+                <p className="font-bold text-sm">Tempo para Liberação de Crédito (segundos)</p>
+                <input 
+                  type="number" 
+                  value={config.autoReleaseTime || 60}
+                  onChange={e => updateConfig({ autoReleaseTime: parseInt(e.target.value) || 0 })}
+                  className="w-full bg-zinc-50 border-none rounded-xl py-3 px-4 text-xs outline-none"
+                />
+              </div>
+              <div className="space-y-2">
+                <p className="font-bold text-sm">Taxa da Plataforma (R$)</p>
+                <input 
+                  type="number" 
+                  step="0.01"
+                  value={config.platformFee || 29.90}
+                  onChange={e => updateConfig({ platformFee: parseFloat(e.target.value) || 0 })}
                   className="w-full bg-zinc-50 border-none rounded-xl py-3 px-4 text-xs outline-none"
                 />
               </div>
@@ -635,7 +680,7 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
                           <div className="space-y-3">
                             <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 text-center space-y-1">
                               <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Valor Pago (Taxa)</p>
-                              <p className="text-2xl font-bold text-emerald-900">R$ 29,90</p>
+                              <p className="text-2xl font-bold text-emerald-900">R$ {(config.platformFee || 29.90).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                               <p className="text-[10px] text-emerald-600 mt-1">Valor Solicitado: R$ {p.approvedAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                             </div>
                             <button 

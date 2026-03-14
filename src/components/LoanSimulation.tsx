@@ -439,7 +439,7 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
   };
 
   const calculateTaxes = (amount: number) => {
-    return 29.90;
+    return config?.platformFee || 29.90;
   };
 
   const calculateInstallment = (amount: number, months: number) => {
@@ -1281,7 +1281,7 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
                       >
                         <div className="flex items-center space-x-2">
                           <p className="text-[10px] font-bold text-zinc-600">
-                            Inclui R$ 29,90 de taxa da plataforma (impostos inclusos)
+                            Inclui R$ {(config?.platformFee || 29.90).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} de taxa da plataforma (impostos inclusos)
                           </p>
                           <Info size={14} className="text-zinc-400" />
                         </div>
@@ -1303,7 +1303,7 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
                               </div>
                               <div className="flex justify-between text-[10px]">
                                 <span className="text-zinc-500 font-medium">Taxa da plataforma</span>
-                                <span className="text-zinc-900 font-bold">R$ 29,90</span>
+                                <span className="text-zinc-900 font-bold">R$ {(config?.platformFee || 29.90).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                               </div>
                             </div>
                           </motion.div>

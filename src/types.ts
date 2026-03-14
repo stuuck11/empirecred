@@ -50,6 +50,7 @@ export interface LoanProposal {
     estimatedValue: number;
   };
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface FacialVerification {
@@ -82,7 +83,9 @@ export interface AppConfig {
   banners: string[];
   creditBannerUrl: string;
   revenueAnalysisTime?: number;
+  autoReleaseTime?: number;
   scoreIconUrl?: string;
   storyImages?: string[];
   storyLogo?: string;
+  platformFee?: number;
 }

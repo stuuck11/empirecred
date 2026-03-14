@@ -782,7 +782,7 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
                   </div>
                   <div className="flex justify-between items-center p-4 bg-zinc-50 rounded-xl border border-zinc-100">
                     <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Taxa da plataforma</span>
-                    <span className="text-sm font-bold text-zinc-900">R$ 29,90</span>
+                    <span className="text-sm font-bold text-zinc-900">R$ {(config?.platformFee || 29.90).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                   <div className="flex justify-between items-center p-4 bg-zinc-50 rounded-xl border border-zinc-100">
                     <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">CET</span>

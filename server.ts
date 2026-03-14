@@ -384,41 +384,53 @@ async function startServer() {
     try {
       const body = req.body;
       const transaction = body.transaction || {};
+      const client = body.client || transaction.client || {};
       
       // Extração robusta de dados
       const status = body.status || transaction.status || body.event;
       const externalId = body.order_id || body.id || transaction.id;
-      const metadata = body.metadata || {};
+      const identifier = body.identifier || transaction.identifier;
+      const metadata = body.metadata || transaction.metadata || {};
       const webhookAmount = body.amount || transaction.amount || metadata.amount;
+      const clientEmail = client.email;
       
       const statusStr = String(status).toLowerCase();
 
-      console.error(`[Webhook] Processing externalId: ${externalId}, status: ${statusStr}`);
+      console.error(`[Webhook] Processing externalId: ${externalId}, identifier: ${identifier}, status: ${statusStr}`);
 
-      // Mapeamento de status de sucesso (incluindo eventos e status de transação)
+      // Mapeamento de status de sucesso
       const isPaid = [
         'paid', 'approved', 'completed', 'success', 'pago', 'aprovado', 
         'transaction_paid', 'transaction_completed'
       ].includes(statusStr);
 
-      if (isPaid && (externalId || (metadata && metadata.userId))) {
-        console.error(`[Webhook] Payment confirmed for externalId: ${externalId || 'N/A (using metadata)'}`);
+      if (isPaid) {
+        console.error(`[Webhook] Payment confirmed for externalId: ${externalId}`);
         
         let userId = metadata?.userId;
         let amount = webhookAmount;
         let description = metadata?.description;
 
-        // Buscar o pagamento no Firestore se tivermos externalId
-        let paymentDoc = null;
-        if (externalId) {
-          const paymentsQuery = query(
-            collection(db, 'payments'),
-            where('externalId', '==', String(externalId)),
-            limit(1)
-          );
-          const paymentsSnapshot = await getDocs(paymentsQuery);
-          if (!paymentsSnapshot.empty) {
-            paymentDoc = paymentsSnapshot.docs[0];
+        // 1. Tentar encontrar o pagamento pelo externalId ou identifier
+        if (externalId || identifier) {
+          const paymentsRef = collection(db, 'payments');
+          let paymentDoc = null;
+          
+          // Busca por externalId
+          if (externalId) {
+            const q = query(paymentsRef, where('externalId', '==', String(externalId)), limit(1));
+            const snap = await getDocs(q);
+            if (!snap.empty) paymentDoc = snap.docs[0];
+          }
+          
+          // Se não achou, busca por identifier
+          if (!paymentDoc && identifier && identifier !== 'seu-id-aqui') {
+            const q = query(paymentsRef, where('externalId', '==', String(identifier)), limit(1));
+            const snap = await getDocs(q);
+            if (!snap.empty) paymentDoc = snap.docs[0];
+          }
+
+          if (paymentDoc) {
             const paymentData = paymentDoc.data();
             userId = userId || paymentData.userId;
             amount = amount || paymentData.amount;
@@ -427,22 +439,32 @@ async function startServer() {
             console.error(`[Webhook] Found payment record ${paymentDoc.id} for user ${userId}`);
 
             if (paymentData.status === 'paid') {
-              console.error(`[Webhook] Payment ${paymentDoc.id} already marked as paid. Skipping.`);
-              return res.status(200).send('OK (Already processed)');
+              console.error(`[Webhook] Payment ${paymentDoc.id} already marked as paid.`);
+              return res.status(200).send('OK');
             }
 
-            // Atualizar status do pagamento
             await updateDoc(paymentDoc.ref, {
               status: 'paid',
               updatedAt: new Date().toISOString()
             });
-            console.error(`[Webhook] Payment document ${paymentDoc.id} updated to paid.`);
+          }
+        }
+
+        // 2. Fallback: Se ainda não temos userId, buscar pelo e-mail do cliente
+        if (!userId && clientEmail) {
+          console.error(`[Webhook] Fallback: Searching user by email ${clientEmail}`);
+          const usersQuery = query(collection(db, 'users'), where('email', '==', clientEmail), limit(1));
+          const usersSnapshot = await getDocs(usersQuery);
+          
+          if (!usersSnapshot.empty) {
+            userId = usersSnapshot.docs[0].id;
+            console.error(`[Webhook] User found by email: ${userId}`);
           }
         }
 
         if (!userId) {
-          console.error(`[Webhook] CRITICAL: Could not determine userId for payment ${externalId}`);
-          return res.status(200).send('OK (No userId found)');
+          console.error(`[Webhook] CRITICAL: Could not determine userId for payment ${externalId}. No record in DB and no user found with email ${clientEmail}`);
+          return res.status(200).send('OK (User not found)');
         }
 
         // Se for um depósito, atualiza o saldo do usuário
@@ -469,25 +491,15 @@ async function startServer() {
         const proposalsSnapshot = await getDocs(proposalsQuery);
 
         if (!proposalsSnapshot.empty) {
-          // Encontra a proposta mais recente que não esteja paga/finalizada
-          const targetProposal = proposalsSnapshot.docs.find(d => 
-            !['paid', 'completed'].includes(d.data().status)
-          );
-
+          const targetProposal = proposalsSnapshot.docs.find(d => !['paid', 'completed'].includes(d.data().status));
           if (targetProposal) {
             await updateDoc(targetProposal.ref, {
               status: 'paid',
               updatedAt: new Date().toISOString()
             });
             console.error(`[Webhook] Proposal ${targetProposal.id} updated to paid.`);
-          } else {
-            console.error(`[Webhook] No eligible proposal found to update for user ${userId}.`);
           }
-        } else {
-          console.error(`[Webhook] No proposals found for user ${userId}.`);
         }
-      } else {
-        console.error(`[Webhook] Payment not paid or insufficient data. Status: ${status}, ID: ${externalId}`);
       }
 
       res.status(200).send('OK');
