@@ -382,20 +382,30 @@ async function startServer() {
     console.error(`[${new Date().toISOString()}] WEBHOOK RECEIVED:`, JSON.stringify(req.body, null, 2));
     
     try {
-      const { status, order_id, id, metadata, amount: webhookAmount } = req.body;
-      const externalId = order_id || id;
+      const body = req.body;
+      const transaction = body.transaction || {};
+      
+      // Extração robusta de dados
+      const status = body.status || transaction.status || body.event;
+      const externalId = body.order_id || body.id || transaction.id;
+      const metadata = body.metadata || {};
+      const webhookAmount = body.amount || transaction.amount || metadata.amount;
+      
       const statusStr = String(status).toLowerCase();
 
       console.error(`[Webhook] Processing externalId: ${externalId}, status: ${statusStr}`);
 
-      // Mapeamento de status de sucesso
-      const isPaid = ['paid', 'approved', 'completed', 'success', 'pago', 'aprovado'].includes(statusStr);
+      // Mapeamento de status de sucesso (incluindo eventos e status de transação)
+      const isPaid = [
+        'paid', 'approved', 'completed', 'success', 'pago', 'aprovado', 
+        'transaction_paid', 'transaction_completed'
+      ].includes(statusStr);
 
       if (isPaid && (externalId || (metadata && metadata.userId))) {
         console.error(`[Webhook] Payment confirmed for externalId: ${externalId || 'N/A (using metadata)'}`);
         
         let userId = metadata?.userId;
-        let amount = webhookAmount || metadata?.amount;
+        let amount = webhookAmount;
         let description = metadata?.description;
 
         // Buscar o pagamento no Firestore se tivermos externalId
