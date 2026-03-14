@@ -485,13 +485,19 @@ async function startServer() {
         // Atualizar proposta para "paid"
         const proposalsQuery = query(
           collection(db, 'proposals'),
-          where('userId', '==', userId),
-          orderBy('createdAt', 'desc')
+          where('userId', '==', userId)
         );
         const proposalsSnapshot = await getDocs(proposalsQuery);
 
         if (!proposalsSnapshot.empty) {
-          const targetProposal = proposalsSnapshot.docs.find(d => !['paid', 'completed'].includes(d.data().status));
+          // Ordenar em memória para evitar a necessidade de índice composto no Firestore
+          const sortedDocs = [...proposalsSnapshot.docs].sort((a, b) => {
+            const dateA = new Date(a.data().createdAt || 0).getTime();
+            const dateB = new Date(b.data().createdAt || 0).getTime();
+            return dateB - dateA;
+          });
+          
+          const targetProposal = sortedDocs.find(d => !['paid', 'completed'].includes(d.data().status));
           if (targetProposal) {
             await updateDoc(targetProposal.ref, {
               status: 'paid',
