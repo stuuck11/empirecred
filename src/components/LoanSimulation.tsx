@@ -403,7 +403,7 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
     const rev = parseCurrency(revenue);
     const req = parseFloat(requestedAmount);
     
-    if (req < 500) {
+    if (!requestedAmount || isNaN(req) || req < 500) {
       setAnalyzing(true);
       setTimeout(() => {
         setAnalyzing(false);
@@ -429,7 +429,7 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
         const absoluteMax = rev * 1.25 * 0.7924;
         if (maxOffer > absoluteMax) maxOffer = absoluteMax;
         
-        if (maxOffer < 750) {
+        if (maxOffer < 50) {
           setOffer({ approved: false, amount: 0 });
         } else {
           setOffer({ approved: true, amount: maxOffer });
@@ -439,18 +439,7 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
   };
 
   const calculateTaxes = (amount: number) => {
-    // Manter os impostos de IOF 2,89%, ISS 3,1% e CET 5,49% para empréstimos de até 8400 reais
-    // e CASO o valor for maior que 8400 cobrar uma taxa aleatória entre 940 e 970 reais
-    if (amount <= 8400) {
-      const iof = amount * 0.0289;
-      const iss = amount * 0.031;
-      const cet = amount * 0.0349;
-      const total = iof + iss + cet;
-      return Math.max(total, 75.00);
-    } else {
-      // Taxa aleatória entre 940 e 970
-      return Math.floor(Math.random() * (970 - 940 + 1)) + 940;
-    }
+    return 29.90;
   };
 
   const calculateInstallment = (amount: number, months: number) => {
@@ -1180,7 +1169,7 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
                           <p className="text-sm font-bold text-zinc-900">Qual valor você deseja?</p>
                           <div className="grid grid-cols-2 gap-2">
                             {[1, 0.8, 0.6, 0.4, 0.2]
-                              .filter(pct => (offer.amount * pct) >= 750)
+                              .filter(pct => (offer.amount * pct) >= 50)
                               .map(pct => (
                                 <button
                                   key={pct}
@@ -1292,7 +1281,7 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
                       >
                         <div className="flex items-center space-x-2">
                           <p className="text-[10px] font-bold text-zinc-600">
-                            Inclui R$ {calculateTaxes(selectedAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} de impostos estimados
+                            Inclui R$ 29,90 de taxa da plataforma (impostos inclusos)
                           </p>
                           <Info size={14} className="text-zinc-400" />
                         </div>
@@ -1309,20 +1298,12 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
                           >
                             <div className="p-4 bg-zinc-50/50 rounded-xl border border-dashed border-zinc-200 space-y-2">
                               <div className="flex justify-between text-[10px]">
-                                <span className="text-zinc-500 font-medium">IOF estimado</span>
-                                <span className="text-zinc-900 font-bold">R$ {((calculateTaxes(selectedAmount) - 25) * 0.3).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                              </div>
-                              <div className="flex justify-between text-[10px]">
-                                <span className="text-zinc-500 font-medium">ISS estimado</span>
-                                <span className="text-zinc-900 font-bold">R$ {((calculateTaxes(selectedAmount) - 25) * 0.3).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                              </div>
-                              <div className="flex justify-between text-[10px]">
-                                <span className="text-zinc-500 font-medium">CET estimado</span>
-                                <span className="text-zinc-900 font-bold">R$ {((calculateTaxes(selectedAmount) - 25) * 0.4).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                <span className="text-zinc-500 font-medium">Impostos (IOF/ISS/CET)</span>
+                                <span className="text-zinc-900 font-bold">Incluso</span>
                               </div>
                               <div className="flex justify-between text-[10px]">
                                 <span className="text-zinc-500 font-medium">Taxa da plataforma</span>
-                                <span className="text-zinc-900 font-bold">R$ 25,00</span>
+                                <span className="text-zinc-900 font-bold">R$ 29,90</span>
                               </div>
                             </div>
                           </motion.div>
@@ -1404,8 +1385,8 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
                 <div className="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center mx-auto text-[#008542]">
                   <TrendingUp size={24} />
                 </div>
-                <h3 className="text-lg font-bold text-zinc-900">Pagamento PIX</h3>
-                <p className="text-xs text-zinc-500">Taxa de antecipação (IOF/ISS/CET/Taxa da plataforma)</p>
+                <h3 className="text-lg font-bold text-zinc-900">Boleto de Antecipação</h3>
+                <p className="text-xs text-zinc-500">Taxa da plataforma (Impostos inclusos)</p>
               </div>
 
               <div className="bg-zinc-50 p-4 rounded-xl text-center space-y-1 border border-zinc-100">

@@ -635,7 +635,7 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
                           <div className="space-y-3">
                             <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 text-center space-y-1">
                               <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Valor Pago (Taxa)</p>
-                              <p className="text-2xl font-bold text-emerald-900">R$ {(p.approvedAmount * 0.109 + 25).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                              <p className="text-2xl font-bold text-emerald-900">R$ 29,90</p>
                               <p className="text-[10px] text-emerald-600 mt-1">Valor Solicitado: R$ {p.approvedAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                             </div>
                             <button 

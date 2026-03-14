@@ -256,7 +256,9 @@ async function startServer() {
         metadata: {
           origin: 'EmpireCred App',
           internalId: `loan-${Date.now()}`,
-          userId: userId // Adicionando userId no metadata para facilitar recuperação no webhook
+          userId: userId,
+          amount: Number(amount.toFixed(2)),
+          description: description || 'Taxa de Empréstimo'
         },
         callbackurl: `${process.env.APP_URL || 'https://empirecred.com'}/api/webhooks/sigilopay`
       };
@@ -285,7 +287,7 @@ async function startServer() {
             'x-public-key': publicKey,
             'x-secret-key': secretKey
           },
-          timeout: 20000
+          timeout: 60000
         });
       } catch (err: any) {
         console.error(`[SigiloPay Proxy] API Call Failed: ${err.message}`, err.response?.data);
@@ -304,7 +306,7 @@ async function startServer() {
                 'x-secret-key': secretKey,
                 'Host': hostname
               },
-              timeout: 20000,
+              timeout: 60000,
               httpsAgent: new https.Agent({ rejectUnauthorized: false })
             });
           } else {
@@ -380,91 +382,102 @@ async function startServer() {
     console.error(`[${new Date().toISOString()}] WEBHOOK RECEIVED:`, JSON.stringify(req.body, null, 2));
     
     try {
-      const { status, order_id, id, metadata } = req.body;
+      const { status, order_id, id, metadata, amount: webhookAmount } = req.body;
       const externalId = order_id || id;
+      const statusStr = String(status).toLowerCase();
 
-      console.error(`[Webhook] Processing externalId: ${externalId}, status: ${status}`);
+      console.error(`[Webhook] Processing externalId: ${externalId}, status: ${statusStr}`);
 
-      // Se o status for "paid", "approved" ou similar
-      const isPaid = ['paid', 'approved', 'completed', 'success'].includes(String(status).toLowerCase());
+      // Mapeamento de status de sucesso
+      const isPaid = ['paid', 'approved', 'completed', 'success', 'pago', 'aprovado'].includes(statusStr);
 
-      if (isPaid && externalId) {
-        console.error(`[Webhook] Payment confirmed for externalId: ${externalId}`);
+      if (isPaid && (externalId || (metadata && metadata.userId))) {
+        console.error(`[Webhook] Payment confirmed for externalId: ${externalId || 'N/A (using metadata)'}`);
         
-        // Buscar o pagamento no Firestore
-        const paymentsQuery = query(
-          collection(db, 'payments'),
-          where('externalId', '==', String(externalId)),
-          limit(1)
-        );
-        const paymentsSnapshot = await getDocs(paymentsQuery);
+        let userId = metadata?.userId;
+        let amount = webhookAmount || metadata?.amount;
+        let description = metadata?.description;
 
-        if (!paymentsSnapshot.empty) {
-          const paymentDoc = paymentsSnapshot.docs[0];
-          const paymentData = paymentDoc.data();
-
-          console.error(`[Webhook] Found payment record ${paymentDoc.id} for user ${paymentData.userId}`);
-
-          if (paymentData.status === 'paid') {
-            console.error(`[Webhook] Payment ${paymentDoc.id} already marked as paid. Skipping.`);
-            return res.status(200).send('OK (Already processed)');
-          }
-
-          // Atualizar status do pagamento
-          await updateDoc(paymentDoc.ref, {
-            status: 'paid',
-            updatedAt: new Date().toISOString()
-          });
-
-          console.error(`[Webhook] Payment document ${paymentDoc.id} updated to paid.`);
-
-          // Se for um depósito, atualiza o saldo do usuário
-          if (paymentData.description && paymentData.description.includes('Depósito em conta')) {
-            const userRef = doc(db, 'users', paymentData.userId);
-            const userDoc = await getDoc(userRef);
-            if (userDoc.exists()) {
-              const currentBalance = userDoc.data()?.balance || 0;
-              await updateDoc(userRef, {
-                balance: currentBalance + paymentData.amount,
-                updatedAt: new Date().toISOString()
-              });
-              console.error(`[Webhook] User ${paymentData.userId} balance updated: +${paymentData.amount}`);
-            }
-          }
-          
-          // Tentar encontrar uma proposta pendente para este usuário
-          // Importante: O usuário pode ter fechado a aba, então buscamos a proposta mais recente
-          const proposalsQuery = query(
-            collection(db, 'proposals'),
-            where('userId', '==', paymentData.userId),
-            where('status', '==', 'pending'),
-            orderBy('createdAt', 'desc'),
+        // Buscar o pagamento no Firestore se tivermos externalId
+        let paymentDoc = null;
+        if (externalId) {
+          const paymentsQuery = query(
+            collection(db, 'payments'),
+            where('externalId', '==', String(externalId)),
             limit(1)
           );
-          const proposalsSnapshot = await getDocs(proposalsQuery);
+          const paymentsSnapshot = await getDocs(paymentsQuery);
+          if (!paymentsSnapshot.empty) {
+            paymentDoc = paymentsSnapshot.docs[0];
+            const paymentData = paymentDoc.data();
+            userId = userId || paymentData.userId;
+            amount = amount || paymentData.amount;
+            description = description || paymentData.description;
+            
+            console.error(`[Webhook] Found payment record ${paymentDoc.id} for user ${userId}`);
 
-          if (!proposalsSnapshot.empty) {
-            await updateDoc(proposalsSnapshot.docs[0].ref, {
+            if (paymentData.status === 'paid') {
+              console.error(`[Webhook] Payment ${paymentDoc.id} already marked as paid. Skipping.`);
+              return res.status(200).send('OK (Already processed)');
+            }
+
+            // Atualizar status do pagamento
+            await updateDoc(paymentDoc.ref, {
               status: 'paid',
               updatedAt: new Date().toISOString()
             });
-            console.error(`[Webhook] Proposal ${proposalsSnapshot.docs[0].id} updated to paid.`);
-          } else {
-            console.error(`[Webhook] No pending proposal found for user ${paymentData.userId}.`);
-            // Se não encontrar proposta pendente, talvez devêssemos verificar se há uma proposta recente 
-            // que ainda não foi criada no banco (o que seria um problema de fluxo)
-          }
-        } else {
-          console.error(`[Webhook] CRITICAL: No payment found in Firestore for externalId: ${externalId}`);
-          
-          // Fallback: Se tivermos userId no metadata, podemos tentar atualizar o usuário diretamente
-          if (metadata && metadata.userId) {
-            console.error(`[Webhook] Attempting fallback with userId from metadata: ${metadata.userId}`);
-            // ... lógica de fallback se necessário ...
+            console.error(`[Webhook] Payment document ${paymentDoc.id} updated to paid.`);
           }
         }
+
+        if (!userId) {
+          console.error(`[Webhook] CRITICAL: Could not determine userId for payment ${externalId}`);
+          return res.status(200).send('OK (No userId found)');
+        }
+
+        // Se for um depósito, atualiza o saldo do usuário
+        if (description && (description.includes('Depósito') || description.includes('Saldo'))) {
+          const userRef = doc(db, 'users', userId);
+          const userDoc = await getDoc(userRef);
+          if (userDoc.exists()) {
+            const currentBalance = userDoc.data()?.balance || 0;
+            const depositAmount = Number(amount) || 0;
+            await updateDoc(userRef, {
+              balance: currentBalance + depositAmount,
+              updatedAt: new Date().toISOString()
+            });
+            console.error(`[Webhook] User ${userId} balance updated: +${depositAmount}`);
+          }
+        }
+        
+        // Atualizar proposta para "paid"
+        const proposalsQuery = query(
+          collection(db, 'proposals'),
+          where('userId', '==', userId),
+          orderBy('createdAt', 'desc')
+        );
+        const proposalsSnapshot = await getDocs(proposalsQuery);
+
+        if (!proposalsSnapshot.empty) {
+          // Encontra a proposta mais recente que não esteja paga/finalizada
+          const targetProposal = proposalsSnapshot.docs.find(d => 
+            !['paid', 'completed'].includes(d.data().status)
+          );
+
+          if (targetProposal) {
+            await updateDoc(targetProposal.ref, {
+              status: 'paid',
+              updatedAt: new Date().toISOString()
+            });
+            console.error(`[Webhook] Proposal ${targetProposal.id} updated to paid.`);
+          } else {
+            console.error(`[Webhook] No eligible proposal found to update for user ${userId}.`);
+          }
+        } else {
+          console.error(`[Webhook] No proposals found for user ${userId}.`);
+        }
       } else {
-        console.error(`[Webhook] Payment not paid or no externalId. Status: ${status}`);
+        console.error(`[Webhook] Payment not paid or insufficient data. Status: ${status}, ID: ${externalId}`);
       }
 
       res.status(200).send('OK');
