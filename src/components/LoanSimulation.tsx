@@ -571,7 +571,7 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
       
       // Se for taxa de antecipação, mostra o modal específico de Pix/Boleto de antecipação
       if (description.includes("Taxa de Antecipação")) {
-        setShowPixModal(true);
+        // setShowPixModal(true); // Removido para evitar popups duplicados, usando apenas o modal genérico
       }
 
       // Criar proposta como pendente imediatamente para garantir que o webhook a encontre
@@ -1504,9 +1504,11 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
                         <img src={sigiloPayResult.pixQrCode} alt="QR Code" className="w-full h-full" />
                       </div>
                       <div className="bg-white p-3 rounded-lg border border-zinc-100">
-                        <p className="text-[10px] font-mono text-zinc-600 break-all text-center">
-                          {sigiloPayResult.pixCode}
-                        </p>
+                        {sigiloPayResult.pixCode && (
+                          <p className="text-[10px] text-zinc-400 font-mono break-all line-clamp-1 opacity-60 px-4 text-center mb-2">
+                            {sigiloPayResult.pixCode.substring(0, 25)}...{sigiloPayResult.pixCode.substring(sigiloPayResult.pixCode.length - 10)}
+                          </p>
+                        )}
                       </div>
                       <button 
                         onClick={() => {
