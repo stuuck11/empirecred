@@ -18,7 +18,7 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
     return val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   });
 
-  const [isEditingRevenue, setIsEditingRevenue] = useState(true);
+  const [isEditingRevenue, setIsEditingRevenue] = useState(false);
   const [revenueStatus, setRevenueStatus] = useState<'approved' | 'analyzing' | 'rejected' | 'waiting_proof' | 'idle'>('idle');
   const [analysisTimeLeft, setAnalysisTimeLeft] = useState(0);
   const [analyzing, setAnalyzing] = useState(false);
