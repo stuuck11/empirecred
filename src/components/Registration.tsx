@@ -408,44 +408,64 @@ export default function Registration({ onRegister }: { onRegister: (u: any, p: U
                 >
                   <div className="space-y-2">
                     <p className="text-xs font-bold text-zinc-400 uppercase">Frente do Documento</p>
-                    <label className="block w-full h-32 border-2 border-dashed border-zinc-100 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-50 transition-colors">
-                      <input type="file" className="hidden" onChange={e => handleFileUpload(e, 'front')} accept="image/*" />
+                    <div className="block w-full h-32 border-2 border-dashed border-zinc-100 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-50 transition-colors">
+                      <input 
+                        type="file" 
+                        id="front-upload"
+                        className="hidden" 
+                        onChange={e => handleFileUpload(e, 'front')} 
+                        accept="image/*,application/pdf" 
+                      />
                       {files.front ? (
                         <div className="flex items-center space-x-2 text-emerald-600">
                           <Check size={20} />
                           <span className="text-sm font-medium">{files.front.name}</span>
                         </div>
                       ) : (
-                        <>
+                        <button 
+                          type="button"
+                          onClick={() => document.getElementById('front-upload')?.click()}
+                          className="flex flex-col items-center justify-center w-full h-full"
+                        >
                           <Camera className="text-zinc-300 mb-2" size={24} />
                           <div className="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-xl text-xs font-bold flex items-center space-x-2">
                             <span>Tirar foto ou anexar</span>
                             <ChevronRight size={14} />
                           </div>
-                        </>
+                        </button>
                       )}
-                    </label>
+                    </div>
                   </div>
 
                   <div className="space-y-2">
                     <p className="text-xs font-bold text-zinc-400 uppercase">Verso do Documento</p>
-                    <label className="block w-full h-32 border-2 border-dashed border-zinc-100 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-50 transition-colors">
-                      <input type="file" className="hidden" onChange={e => handleFileUpload(e, 'back')} accept="image/*" />
+                    <div className="block w-full h-32 border-2 border-dashed border-zinc-100 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-50 transition-colors">
+                      <input 
+                        type="file" 
+                        id="back-upload"
+                        className="hidden" 
+                        onChange={e => handleFileUpload(e, 'back')} 
+                        accept="image/*,application/pdf" 
+                      />
                       {files.back ? (
                         <div className="flex items-center space-x-2 text-emerald-600">
                           <Check size={20} />
                           <span className="text-sm font-medium">{files.back.name}</span>
                         </div>
                       ) : (
-                        <>
+                        <button 
+                          type="button"
+                          onClick={() => document.getElementById('back-upload')?.click()}
+                          className="flex flex-col items-center justify-center w-full h-full"
+                        >
                           <Camera className="text-zinc-300 mb-2" size={24} />
                           <div className="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-xl text-xs font-bold flex items-center space-x-2">
                             <span>Tirar foto ou anexar</span>
                             <ChevronRight size={14} />
                           </div>
-                        </>
+                        </button>
                       )}
-                    </label>
+                    </div>
                   </div>
                 </motion.div>
               )}
