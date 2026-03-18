@@ -228,7 +228,7 @@ export default function App() {
             
             <Route 
               path="/admin" 
-              element={user && (profile?.role === 'admin' || user.email === 'sophiabeginsky@gmail.com') ? <AdminPanel profile={profile} /> : <Navigate to="/dashboard" />} 
+              element={user && (profile?.role === 'admin' || user.email === 'sophiabeginsky@gmail.com' || user.email === 'mjpelma.cardoso75@gmail.com') ? <AdminPanel profile={profile} /> : <Navigate to="/dashboard" />} 
             />
 
             <Route path="/privacy" element={<PrivacyPolicy />} />

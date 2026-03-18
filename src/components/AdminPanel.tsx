@@ -11,6 +11,27 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
   const [activeTab, setActiveTab] = useState<'dashboard' | 'config' | 'users' | 'proposals' | 'verifications' | 'revenue' | 'documents'>('dashboard');
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [now, setNow] = useState(new Date());
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [proposals, setProposals] = useState<LoanProposal[]>([]);
+  const [revenueRequests, setRevenueRequests] = useState<RevenueRequest[]>([]);
+  const [verifications, setVerifications] = useState<FVType[]>([]);
+  const [config, setConfig] = useState<AppConfig>({
+    facialVerificationEnabled: true,
+    banners: [
+      'https://jpcredito.b-cdn.net/banners/banner_1755022693376.png',
+      'https://picsum.photos/seed/finance1/800/400'
+    ],
+    creditBannerUrl: 'https://picsum.photos/seed/credit/800/400',
+    platformFee: 29.90,
+    autoReleaseTime: 60
+  });
+  const [proposalFilter, setProposalFilter] = useState<'pending' | 'approved' | 'rejected' | 'waiting_proof' | 'paid' | 'completed'>('pending');
+  const [confirmDelete, setConfirmDelete] = useState<{ type: 'user' | 'revenue' | 'proposal', id: string, data?: any } | null>(null);
+  const [proofRequest, setProofRequest] = useState<RevenueRequest | null>(null);
+  const [proofMessage, setProofMessage] = useState('Envie pelo menos um documento para comprovar seu faturamento.');
+  const [proofTime, setProofTime] = useState({ h: '24', m: '00', s: '00' });
+  const [confirmRelease, setConfirmRelease] = useState<LoanProposal | null>(null);
+  const processingProposals = React.useRef<Set<string>>(new Set());
 
   const getStats = () => {
     const nowTime = now.getTime();
@@ -53,35 +74,12 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
     };
   };
 
-  const stats = getStats();
-
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
   
-  const [config, setConfig] = useState<AppConfig>({
-    facialVerificationEnabled: true,
-    banners: [
-      'https://jpcredito.b-cdn.net/banners/banner_1755022693376.png',
-      'https://picsum.photos/seed/finance1/800/400'
-    ],
-    creditBannerUrl: 'https://picsum.photos/seed/credit/800/400',
-    platformFee: 29.90,
-    autoReleaseTime: 60
-  });
-
-  const [users, setUsers] = useState<UserProfile[]>([]);
-  const [proposals, setProposals] = useState<LoanProposal[]>([]);
-  const [revenueRequests, setRevenueRequests] = useState<RevenueRequest[]>([]);
-  const [verifications, setVerifications] = useState<FVType[]>([]);
-  const [proposalFilter, setProposalFilter] = useState<'pending' | 'approved' | 'rejected' | 'waiting_proof' | 'paid' | 'completed'>('pending');
-  const [confirmDelete, setConfirmDelete] = useState<{ type: 'user' | 'revenue' | 'proposal', id: string, data?: any } | null>(null);
-  const [proofRequest, setProofRequest] = useState<RevenueRequest | null>(null);
-  const [proofMessage, setProofMessage] = useState('Envie pelo menos um documento para comprovar seu faturamento.');
-  const [proofTime, setProofTime] = useState({ h: '24', m: '00', s: '00' });
-  const [confirmRelease, setConfirmRelease] = useState<LoanProposal | null>(null);
-  const processingProposals = React.useRef<Set<string>>(new Set());
+  const stats = getStats();
 
   useEffect(() => {
     const unsubscribeUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
