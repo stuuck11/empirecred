@@ -851,20 +851,20 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
                 <div className="space-y-2">
                   <h4 className="font-bold text-zinc-900">Suporte via WhatsApp</h4>
                   <p className="text-sm text-zinc-500 leading-relaxed">
-                    Nossa equipe está pronta para te ajudar. Clique no botão abaixo para iniciar uma conversa.
+                    Nossa equipe está pronta para te ajudar 24 horas por dia. Clique no botão abaixo para iniciar uma conversa.
                   </p>
                 </div>
                 
                 <div className="bg-zinc-50 p-6 rounded-2xl border border-zinc-100 text-left space-y-4">
                   <div className="flex items-center space-x-3">
                     <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                    <span className="text-xs font-bold text-zinc-600 uppercase tracking-widest">Atendimento Online</span>
+                    <span className="text-xs font-bold text-zinc-600 uppercase tracking-widest">Atendimento Online 24h</span>
                   </div>
-                  <p className="text-xs text-zinc-500">Horário de atendimento: Seg a Sáb, das 08h às 21h.</p>
+                  <p className="text-xs text-zinc-500">Suporte disponível 24 horas por dia, 7 dias por semana.</p>
                 </div>
 
                 <button 
-                  onClick={() => window.open('https://wa.me/5511999999999', '_blank')}
+                  onClick={() => window.open('https://wa.me/5511957978342', '_blank')}
                   className="w-full bg-[#25D366] text-white py-4 rounded-2xl font-bold shadow-lg flex items-center justify-center space-x-2"
                 >
                   <MessageCircle size={20} />

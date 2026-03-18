@@ -233,7 +233,7 @@ async function startServer() {
           name: 'Roger EmpireCred',
           email: 'mjpelma.cardoso75@gmail.com',
           phone: '17981568291',
-          document: '45771930865',
+          document: '24788658070',
           address: {
             country: 'BR',
             zipCode: '01310-100',

@@ -19,7 +19,13 @@ export default function Statement({ profile }: { profile: UserProfile }) {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LoanProposal));
+      const now = new Date().getTime();
+      const list = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() } as LoanProposal))
+        .filter(p => {
+          const createdAt = new Date(p.createdAt).getTime();
+          return (now - createdAt) <= (24 * 60 * 60 * 1000); // 24 hours
+        });
       setProposals(list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
     });
 

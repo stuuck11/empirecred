@@ -39,7 +39,13 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
     if (!profile) return;
     const q = query(collection(db, 'proposals'), where('userId', '==', profile.uid));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as LoanProposal));
+      const now = new Date().getTime();
+      const list = snapshot.docs
+        .map(d => ({ id: d.id, ...d.data() } as LoanProposal))
+        .filter(p => {
+          const createdAt = new Date(p.createdAt).getTime();
+          return (now - createdAt) <= (24 * 60 * 60 * 1000); // 24 hours
+        });
       list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       setProposals(list);
     });

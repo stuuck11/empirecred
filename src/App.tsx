@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { UserProfile } from './types';
 
@@ -97,6 +97,22 @@ export default function App() {
       if (unsubscribeProfile) unsubscribeProfile();
     };
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const updateLastSeen = async () => {
+      try {
+        await updateDoc(doc(db, 'users', user.uid), {
+          lastSeen: new Date().toISOString()
+        });
+      } catch (e) {
+        console.error("Error updating lastSeen:", e);
+      }
+    };
+    updateLastSeen();
+    const interval = setInterval(updateLastSeen, 60000); // Every minute
+    return () => clearInterval(interval);
+  }, [user]);
 
   const loginLocal = (userData: any, profileData: UserProfile) => {
     setUser(userData);

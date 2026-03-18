@@ -1,16 +1,59 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { Settings, Users, FileText, Shield, Plus, Trash2, ArrowLeft, Edit2, Save, Check, X, TrendingUp, Download, X as CloseIcon } from 'lucide-react';
+import { Settings, Users, FileText, Shield, Plus, Trash2, ArrowLeft, Edit2, Save, Check, X, TrendingUp, Download, Activity, X as CloseIcon } from 'lucide-react';
 import { collection, onSnapshot, doc, updateDoc, deleteDoc, setDoc, getDoc, query, where, getDocs, deleteField } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { AppConfig, UserProfile, LoanProposal, RevenueRequest, FacialVerification as FVType } from '../types';
 
 export default function AdminPanel({ profile }: { profile: UserProfile | null }) {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'config' | 'users' | 'proposals' | 'verifications' | 'revenue' | 'documents'>('config');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'config' | 'users' | 'proposals' | 'verifications' | 'revenue' | 'documents'>('dashboard');
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [now, setNow] = useState(new Date());
+
+  const getStats = () => {
+    const nowTime = now.getTime();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const startOfYesterday = startOfToday - (24 * 60 * 60 * 1000);
+    
+    const usersToday = users.filter(u => u.createdAt && new Date(u.createdAt).getTime() >= startOfToday).length;
+    const usersYesterday = users.filter(u => {
+      if (!u.createdAt) return false;
+      const time = new Date(u.createdAt).getTime();
+      return time >= startOfYesterday && time < startOfToday;
+    }).length;
+    
+    const onlineUsers = users.filter(u => {
+      if (!u.lastSeen) return false;
+      const lastSeen = new Date(u.lastSeen).getTime();
+      return (nowTime - lastSeen) <= (5 * 60 * 1000); // 5 minutes
+    }).length;
+
+    const totalProposals = proposals.length;
+    const approvedProposals = proposals.filter(p => p.status === 'approved' || p.status === 'completed' || p.status === 'paid').length;
+    const pendingProposals = proposals.filter(p => p.status === 'pending').length;
+    
+    const approvalRate = totalProposals > 0 ? (approvedProposals / totalProposals) * 100 : 0;
+
+    const totalRevenue = proposals
+      .filter(p => p.status === 'paid' || p.status === 'completed')
+      .reduce((acc, p) => acc + (p.approvedAmount || 0), 0);
+
+    return {
+      totalUsers: users.length,
+      usersToday,
+      usersYesterday,
+      onlineUsers,
+      totalProposals,
+      approvedProposals,
+      pendingProposals,
+      approvalRate,
+      totalRevenue
+    };
+  };
+
+  const stats = getStats();
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
@@ -317,6 +360,7 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
       <aside className="w-full md:w-64 bg-white border-r border-zinc-200 p-6 space-y-8">
         <h1 className="text-xl font-bold">EmpireCred Admin</h1>
         <nav className="space-y-2">
+          <TabButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<TrendingUp size={18}/>} label="Dashboard" />
           <TabButton active={activeTab === 'config'} onClick={() => setActiveTab('config')} icon={<Settings size={18}/>} label="Configurações" />
           <TabButton active={activeTab === 'users'} onClick={() => setActiveTab('users')} icon={<Users size={18}/>} label="Usuários" />
           <TabButton active={activeTab === 'proposals'} onClick={() => setActiveTab('proposals')} icon={<FileText size={18}/>} label="Propostas" />
@@ -337,6 +381,94 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
 
       {/* Content */}
       <main className="flex-1 p-8 overflow-y-auto">
+        {activeTab === 'dashboard' && (
+          <div className="space-y-8">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-zinc-900">Relatório em Tempo Real</h2>
+              <div className="flex items-center space-x-2 bg-emerald-50 px-4 py-2 rounded-full border border-emerald-100">
+                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                <span className="text-xs font-bold text-emerald-700 uppercase tracking-widest">Atualizado Agora</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <StatCard 
+                title="Usuários Online" 
+                value={stats.onlineUsers.toString()} 
+                icon={<Activity className="text-emerald-500" size={20} />}
+                trend="Tempo real"
+              />
+              <StatCard 
+                title="Novos Hoje" 
+                value={stats.usersToday.toString()} 
+                icon={<Users className="text-blue-500" size={20} />}
+                trend={`${stats.usersYesterday} ontem`}
+              />
+              <StatCard 
+                title="Total Usuários" 
+                value={stats.totalUsers.toString()} 
+                icon={<Users className="text-zinc-500" size={20} />}
+                trend="Base total"
+              />
+              <StatCard 
+                title="Taxa de Aprovação" 
+                value={`${stats.approvalRate.toFixed(1)}%`} 
+                icon={<Check className="text-emerald-500" size={20} />}
+                trend="Média global"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 bg-white p-8 rounded-[32px] border border-zinc-100 shadow-sm space-y-6">
+                <h3 className="font-bold text-lg">Métricas de Propostas</h3>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="p-6 bg-zinc-50 rounded-2xl space-y-1">
+                    <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Total</p>
+                    <p className="text-2xl font-bold text-zinc-900">{stats.totalProposals}</p>
+                  </div>
+                  <div className="p-6 bg-emerald-50 rounded-2xl space-y-1">
+                    <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Aprovadas</p>
+                    <p className="text-2xl font-bold text-emerald-600">{stats.approvedProposals}</p>
+                  </div>
+                  <div className="p-6 bg-amber-50 rounded-2xl space-y-1">
+                    <p className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">Pendentes</p>
+                    <p className="text-2xl font-bold text-amber-600">{stats.pendingProposals}</p>
+                  </div>
+                </div>
+                
+                <div className="pt-6 border-t border-zinc-100">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-bold text-zinc-600">Volume Total Liberado</p>
+                    <p className="text-xl font-bold text-zinc-900">R$ {stats.totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                  </div>
+                  <div className="w-full bg-zinc-100 h-2 rounded-full overflow-hidden">
+                    <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${stats.approvalRate}%` }} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-zinc-900 p-8 rounded-[32px] text-white space-y-6">
+                <h3 className="font-bold text-lg">Engajamento</h3>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-zinc-400">Conversão de Cadastro</span>
+                    <span className="font-bold">{(stats.totalProposals / (stats.totalUsers || 1) * 100).toFixed(1)}%</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-zinc-400">Usuários Ativos (5m)</span>
+                    <span className="font-bold">{stats.onlineUsers}</span>
+                  </div>
+                </div>
+                <div className="pt-6 border-t border-white/10">
+                  <p className="text-xs text-zinc-400 leading-relaxed">
+                    Dica: Aumente a taxa de aprovação oferecendo suporte proativo aos usuários com propostas pendentes.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {activeTab === 'config' && config && (
           <div className="max-w-2xl space-y-8">
             <section className="bg-white p-6 rounded-3xl border border-zinc-100 shadow-sm space-y-6">
@@ -1064,6 +1196,23 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
           )}
         </AnimatePresence>
       </main>
+    </div>
+  );
+}
+
+function StatCard({ title, value, icon, trend }: { title: string, value: string, icon: React.ReactNode, trend: string }) {
+  return (
+    <div className="bg-white p-6 rounded-[28px] border border-zinc-100 shadow-sm space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="p-3 bg-zinc-50 rounded-2xl">
+          {icon}
+        </div>
+        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{trend}</span>
+      </div>
+      <div>
+        <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1">{title}</p>
+        <p className="text-3xl font-bold text-zinc-900">{value}</p>
+      </div>
     </div>
   );
 }
