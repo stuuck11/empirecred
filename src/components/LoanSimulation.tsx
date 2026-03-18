@@ -721,7 +721,6 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
                               setRevenue(formatted);
                             }}
                             placeholder="0,00"
-                            autoFocus
                             className="w-full bg-zinc-50 border-none rounded-2xl py-4 pl-12 pr-5 text-lg font-bold focus:ring-2 focus:ring-[#008542] outline-none"
                           />
                         </div>
