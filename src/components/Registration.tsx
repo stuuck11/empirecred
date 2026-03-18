@@ -418,7 +418,10 @@ export default function Registration({ onRegister }: { onRegister: (u: any, p: U
                       ) : (
                         <>
                           <Camera className="text-zinc-300 mb-2" size={24} />
-                          <span className="text-xs text-zinc-400">Tirar foto ou anexar</span>
+                          <div className="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-xl text-xs font-bold flex items-center space-x-2">
+                            <span>Tirar foto ou anexar</span>
+                            <ChevronRight size={14} />
+                          </div>
                         </>
                       )}
                     </label>
@@ -436,7 +439,10 @@ export default function Registration({ onRegister }: { onRegister: (u: any, p: U
                       ) : (
                         <>
                           <Camera className="text-zinc-300 mb-2" size={24} />
-                          <span className="text-xs text-zinc-400">Tirar foto ou anexar</span>
+                          <div className="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-xl text-xs font-bold flex items-center space-x-2">
+                            <span>Tirar foto ou anexar</span>
+                            <ChevronRight size={14} />
+                          </div>
                         </>
                       )}
                     </label>
