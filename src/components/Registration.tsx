@@ -409,7 +409,7 @@ export default function Registration({ onRegister }: { onRegister: (u: any, p: U
                   <div className="space-y-2">
                     <p className="text-xs font-bold text-zinc-400 uppercase">Frente do Documento</p>
                     <label className="block w-full h-32 border-2 border-dashed border-zinc-100 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-50 transition-colors">
-                      <input type="file" className="hidden" onChange={e => handleFileUpload(e, 'front')} accept="image/*" />
+                      <input type="file" className="hidden" onChange={e => handleFileUpload(e, 'front')} accept="image/*" capture="environment" />
                       {files.front ? (
                         <div className="flex items-center space-x-2 text-emerald-600">
                           <Check size={20} />
@@ -427,7 +427,7 @@ export default function Registration({ onRegister }: { onRegister: (u: any, p: U
                   <div className="space-y-2">
                     <p className="text-xs font-bold text-zinc-400 uppercase">Verso do Documento</p>
                     <label className="block w-full h-32 border-2 border-dashed border-zinc-100 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-50 transition-colors">
-                      <input type="file" className="hidden" onChange={e => handleFileUpload(e, 'back')} accept="image/*" />
+                      <input type="file" className="hidden" onChange={e => handleFileUpload(e, 'back')} accept="image/*" capture="environment" />
                       {files.back ? (
                         <div className="flex items-center space-x-2 text-emerald-600">
                           <Check size={20} />
