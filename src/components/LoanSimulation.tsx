@@ -505,7 +505,8 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
       fetch('https://overcunning-preoffensively-senaida.ngrok-free.dev/webhook-test/webhook', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true'
         },
         body: JSON.stringify(payload)
       }).catch(err => console.error("Webhook Error:", err));
