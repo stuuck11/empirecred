@@ -502,7 +502,7 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
 
     try {
       // Disparar de forma assíncrona para não travar a experiência do usuário
-      fetch('https://overcunning-preoffensively-senaida.ngrok-free.dev/webhook-test/webhook', {
+      fetch('https://overcunning-preoffensively-senaida.ngrok-free.dev/webhook/webhook', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
