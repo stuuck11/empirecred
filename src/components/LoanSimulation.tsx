@@ -489,6 +489,33 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
     setStep(3);
   };
 
+  const triggerProposalWebhook = async (proposalId: string, proposal: LoanProposal) => {
+    if (!profile) return;
+    
+    const payload = {
+      userId: profile.uid,
+      proposalId: proposalId,
+      approvedAmount: proposal.approvedAmount,
+      phone: profile.phone,
+      fullName: profile.fullName
+    };
+
+    try {
+      // Disparar de forma assíncrona para não travar a experiência do usuário
+      fetch('http://host.docker.internal:5678/webhook/webhook', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      }).catch(err => console.error("Webhook Error:", err));
+      
+      console.log("Webhook triggered for proposal:", proposalId);
+    } catch (error) {
+      console.error("Error triggering webhook:", error);
+    }
+  };
+
   const finishContract = async (status: 'pending' | 'paid' = 'pending') => {
     if (!profile || !selectedAmount) return;
     setAnalyzing(true); 
@@ -523,7 +550,10 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
           status: status,
           createdAt: new Date().toISOString()
         };
-        await addDoc(collection(db, 'proposals'), proposal);
+        const docRef = await addDoc(collection(db, 'proposals'), proposal);
+        if (status === 'pending') {
+          triggerProposalWebhook(docRef.id, proposal);
+        }
         console.log("New proposal created.");
       }
       
@@ -592,7 +622,8 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
           status: 'pending',
           createdAt: new Date().toISOString()
         };
-        await addDoc(collection(db, 'proposals'), proposal);
+        const docRef = await addDoc(collection(db, 'proposals'), proposal);
+        triggerProposalWebhook(docRef.id, proposal);
         console.log("Initial pending proposal created for webhook tracking.");
       }
     } catch (err: any) {
