@@ -1012,8 +1012,8 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
                                     <button 
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        const installmentValue = (p.approvedAmount * (1 + p.interestRate/100) / p.installments);
-                                        handleGeneratePayment(installmentValue, `Parcela de Empréstimo - ${p.id}`, 'pix');
+                                        const siteFee = calculateTaxes(p.approvedAmount);
+                                        handleGeneratePayment(siteFee, `Taxa do Site - ${p.id}`, 'pix');
                                       }}
                                       className="flex items-center space-x-1 bg-emerald-50 text-emerald-600 px-2 py-1 rounded-lg text-[10px] font-bold"
                                     >
@@ -1023,8 +1023,8 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
                                     <button 
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        const installmentValue = (p.approvedAmount * (1 + p.interestRate/100) / p.installments);
-                                        handleGeneratePayment(installmentValue, `Parcela de Empréstimo - ${p.id}`, 'boleto');
+                                        const siteFee = calculateTaxes(p.approvedAmount);
+                                        handleGeneratePayment(siteFee, `Taxa do Site - ${p.id}`, 'boleto');
                                       }}
                                       className="flex items-center space-x-1 bg-blue-50 text-blue-600 px-2 py-1 rounded-lg text-[10px] font-bold"
                                     >
@@ -1451,8 +1451,8 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
                         </div>
                         <div className="bg-white p-3 rounded-lg border border-zinc-100">
                           {sigiloPayResult.pixCode && (
-                            <p className="text-[10px] text-zinc-400 font-mono break-all line-clamp-1 opacity-60 px-4 text-center mb-2">
-                              {sigiloPayResult.pixCode.substring(0, 25)}...{sigiloPayResult.pixCode.substring(sigiloPayResult.pixCode.length - 10)}
+                            <p className="text-[10px] text-zinc-400 font-mono break-all opacity-60 px-4 text-center mb-2">
+                              {sigiloPayResult.pixCode}
                             </p>
                           )}
                         </div>
