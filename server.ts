@@ -361,6 +361,7 @@ async function startServer() {
         pixCode: pixCode,
         pixQrCode: pixQrCode,
         amount: payload.amount,
+        externalId: String(externalId),
         barcode: data.barcode || data.digitableLine || (orderData.id ? `BOL-${orderData.id}` : null),
         paymentLink: data.url || orderData.url || data.payment_url || data.checkoutUrl
       };

@@ -10,6 +10,7 @@ export interface SigiloPayResponse {
   barcode?: string;
   paymentLink?: string;
   amount?: number;
+  externalId?: string;
   error?: string;
 }
 

@@ -373,13 +373,13 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
   const [showPercentages, setShowPercentages] = useState(false);
   const [installments, setInstallments] = useState(12);
   const [termsAccepted, setTermsAccepted] = useState(false);
-  const [showPixModal, setShowPixModal] = useState(false);
   const [showTaxDetails, setShowTaxDetails] = useState(false);
   const [error, setError] = useState('');
   const [sigiloPayResult, setSigiloPayResult] = useState<SigiloPayResponse | null>(null);
   const [isGeneratingPayment, setIsGeneratingPayment] = useState(false);
   const [paymentDescription, setPaymentDescription] = useState('');
   const [copied, setCopied] = useState<string | null>(null);
+  const [paymentConfirmed, setPaymentConfirmed] = useState(false);
 
   const [vehicleData, setVehicleData] = useState({ brand: '', model: '', year: '', value: '' });
 
@@ -533,7 +533,6 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
       handleFirestoreError(error, OperationType.CREATE, 'proposals');
     } finally {
       setAnalyzing(false);
-      setShowPixModal(false);
     }
   };
 
@@ -577,7 +576,7 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
       
       // Se for taxa de antecipação, mostra o modal específico de Pix/Boleto de antecipação
       if (description.includes("Taxa de Antecipação")) {
-        // setShowPixModal(true); // Removido para evitar popups duplicados, usando apenas o modal genérico
+        // Modal será aberto automaticamente pelo setSigiloPayResult
       }
 
       // Criar proposta como pendente imediatamente para garantir que o webhook a encontre
@@ -605,25 +604,39 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
   };
 
   useEffect(() => {
+    if (!sigiloPayResult) {
+      setPaymentConfirmed(false);
+    }
+  }, [sigiloPayResult]);
+
+  useEffect(() => {
     if (!profile || !sigiloPayResult) return;
 
     // Monitorar pagamentos confirmados do usuário
-    const q = query(
-      collection(db, 'payments'),
-      where('userId', '==', profile.uid),
-      where('status', '==', 'paid')
-    );
+    // Se tivermos externalId, monitoramos apenas esse pagamento específico
+    // Caso contrário, monitoramos qualquer pagamento pago criado após agora (fallback)
+    const q = sigiloPayResult.externalId 
+      ? query(
+          collection(db, 'payments'),
+          where('userId', '==', profile.uid),
+          where('externalId', '==', sigiloPayResult.externalId),
+          where('status', '==', 'paid')
+        )
+      : query(
+          collection(db, 'payments'),
+          where('userId', '==', profile.uid),
+          where('status', '==', 'paid'),
+          where('createdAt', '>=', new Date().toISOString())
+        );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       if (!snapshot.empty) {
         // Pagamento confirmado!
-        setSigiloPayResult(null);
-        setShowPixModal(false);
+        console.log("Payment confirmed via Snapshot!");
+        setPaymentConfirmed(true);
         
         // Se estivermos no passo 3 (contratação), finalizamos o contrato como pago
-        if (step === 3) {
-          finishContract('paid');
-        }
+        // Mas NÃO fechamos o modal automaticamente agora, deixamos o usuário ver a confirmação
       }
     });
 
@@ -1363,107 +1376,8 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
         </div>
       </div>
 
-      {/* PIX Modal */}
       <AnimatePresence>
-        {showPixModal && selectedAmount && (
-          <div className="fixed inset-0 z-[100] flex items-end justify-center p-4 sm:items-center">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowPixModal(false)}
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            />
-            <motion.div 
-              initial={{ opacity: 0, y: 100 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 100 }}
-              className="relative w-full max-w-[380px] bg-white rounded-2xl p-6 space-y-4 overflow-y-auto max-h-[90vh] scrollbar-hide"
-            >
-              <div className="absolute top-4 right-4">
-                <button onClick={() => setShowPixModal(false)} className="text-zinc-400 hover:text-zinc-600">
-                  <X size={20} />
-                </button>
-              </div>
-
-              <div className="text-center space-y-2">
-                <div className="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center mx-auto text-[#008542]">
-                  <TrendingUp size={24} />
-                </div>
-                <h3 className="text-lg font-bold text-zinc-900">Boleto de Antecipação</h3>
-                <p className="text-xs text-zinc-500">Taxa da plataforma (Impostos inclusos)</p>
-              </div>
-
-              <div className="bg-zinc-50 p-4 rounded-xl text-center space-y-1 border border-zinc-100">
-                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Valor a pagar</p>
-                <p className="text-2xl font-bold text-zinc-900">R$ {calculateTaxes(selectedAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-              </div>
-
-              <div className="space-y-3">
-                <div className="aspect-square bg-white border-2 border-zinc-100 rounded-2xl p-4 flex items-center justify-center">
-                  {sigiloPayResult?.pixQrCode ? (
-                    <img 
-                      src={sigiloPayResult.pixQrCode} 
-                      alt="QR Code Pix" 
-                      className="w-full h-full object-contain"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-zinc-900 rounded-xl flex items-center justify-center p-4">
-                      <div className="grid grid-cols-4 gap-2 w-full h-full opacity-20">
-                        {Array.from({ length: 16 }).map((_, i) => (
-                          <div key={i} className="bg-white rounded-sm" />
-                        ))}
-                      </div>
-                      <div className="absolute flex flex-col items-center space-y-2">
-                        <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-zinc-900">
-                          <Play size={24} fill="currentColor" />
-                        </div>
-                        <span className="text-[10px] font-bold text-white uppercase tracking-widest">Gerando QR Code...</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <button 
-                  onClick={() => {
-                    const code = sigiloPayResult?.pixCode || "00020126580014BR.GOV.BCB.PIX0136123e4567-e89b-12d3-a456-4266141740005204000053039865802BR5913EMPIRECRED PAGS6009SAO PAULO62070503***6304E2B4";
-                    navigator.clipboard.writeText(code);
-                    setCopied('pix_static');
-                    setTimeout(() => setCopied(null), 2000);
-                  }}
-                  className="w-full py-4 rounded-2xl font-bold text-sm border-2 border-zinc-100 hover:bg-zinc-50 transition-colors relative"
-                >
-                  <AnimatePresence>
-                    {copied === 'pix_static' && (
-                      <motion.div 
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        className="absolute inset-0 flex items-center justify-center bg-zinc-900 text-white rounded-2xl"
-                      >
-                        <Check size={18} className="mr-2" />
-                        Copiado!
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                  Copiar código PIX
-                </button>
-
-                <button 
-                  onClick={() => finishContract('paid')}
-                  className="w-full bg-zinc-900 text-white py-4 rounded-2xl font-bold shadow-xl"
-                >
-                  Confirmar Pagamento
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {sigiloPayResult && !showPixModal && (
+        {sigiloPayResult && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }}
@@ -1479,102 +1393,80 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
               className="relative w-full max-w-[380px] bg-white rounded-[24px] p-6 space-y-4 overflow-y-auto max-h-[90vh] shadow-2xl scrollbar-hide"
             >
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold text-zinc-900">Pagamento Seguro</h3>
+                <h3 className="text-lg font-bold text-zinc-900">
+                  {paymentConfirmed ? 'Pagamento Confirmado' : 'Pagamento Seguro'}
+                </h3>
                 <button onClick={() => setSigiloPayResult(null)} className="text-zinc-400 p-1">
                   <X size={20} />
                 </button>
               </div>
 
-              <div className="text-center space-y-4">
-                <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto text-[#008542]">
-                  {sigiloPayResult.pixCode ? <QrCode size={32} /> : <Receipt size={32} />}
+              {paymentConfirmed ? (
+                <div className="text-center space-y-6 py-8">
+                  <motion.div 
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto text-emerald-600"
+                  >
+                    <Check size={40} />
+                  </motion.div>
+                  <div className="space-y-2">
+                    <h4 className="text-xl font-bold text-zinc-900">Tudo pronto!</h4>
+                    <p className="text-sm text-zinc-500">
+                      Seu pagamento foi identificado com sucesso. Nossa equipe já está processando sua solicitação.
+                    </p>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      setSigiloPayResult(null);
+                      if (step === 3) finishContract('paid');
+                    }}
+                    className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-bold shadow-lg"
+                  >
+                    Continuar
+                  </button>
                 </div>
-                
-                <div className="space-y-1">
-                  <h4 className="font-bold text-zinc-900">Pagamento Gerado</h4>
-                  <p className="text-xs text-zinc-500">
-                    Use os dados abaixo para realizar o pagamento da sua {paymentDescription.toLowerCase().includes('parcela') ? 'parcela' : 'taxa de antecipação'} de forma segura.
-                  </p>
-                  {sigiloPayResult.amount && (
-                    <div className="mt-2 py-1.5 px-4 bg-emerald-50 text-[#008542] rounded-full inline-block font-bold text-base">
-                      Valor: R$ {sigiloPayResult.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </div>
-                  )}
-                </div>
+              ) : (
+                <div className="text-center space-y-4">
+                  <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto text-[#008542]">
+                    {sigiloPayResult.pixCode ? <QrCode size={32} /> : <Receipt size={32} />}
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <h4 className="font-bold text-zinc-900">Pagamento Gerado</h4>
+                    <p className="text-xs text-zinc-500">
+                      Use os dados abaixo para realizar o pagamento da sua {paymentDescription.toLowerCase().includes('parcela') ? 'parcela' : 'taxa de antecipação'} de forma segura.
+                    </p>
+                    {sigiloPayResult.amount && (
+                      <div className="mt-2 py-1.5 px-4 bg-emerald-50 text-[#008542] rounded-full inline-block font-bold text-base">
+                        Valor: R$ {sigiloPayResult.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                    )}
+                  </div>
 
-                <div className="bg-zinc-50 p-4 rounded-xl border border-zinc-100 space-y-3">
-                  {sigiloPayResult.pixCode ? (
-                    <div className="space-y-3">
-                      <div className="w-32 h-32 bg-white p-2 rounded-lg mx-auto border border-zinc-100">
-                        <img src={sigiloPayResult.pixQrCode} alt="QR Code" className="w-full h-full" />
-                      </div>
-                      <div className="bg-white p-3 rounded-lg border border-zinc-100">
-                        {sigiloPayResult.pixCode && (
-                          <p className="text-[10px] text-zinc-400 font-mono break-all line-clamp-1 opacity-60 px-4 text-center mb-2">
-                            {sigiloPayResult.pixCode.substring(0, 25)}...{sigiloPayResult.pixCode.substring(sigiloPayResult.pixCode.length - 10)}
-                          </p>
-                        )}
-                      </div>
-                      <button 
-                        onClick={() => {
-                          navigator.clipboard.writeText(sigiloPayResult.pixCode!);
-                          setCopied('pix');
-                          setTimeout(() => setCopied(null), 2000);
-                        }}
-                        className="flex items-center justify-center space-x-2 w-full text-[#008542] text-xs font-bold uppercase tracking-widest relative py-2"
-                      >
-                        <AnimatePresence mode="wait">
-                          {copied === 'pix' ? (
-                            <motion.div 
-                              key="copied"
-                              initial={{ opacity: 0, scale: 0.8 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              exit={{ opacity: 0, scale: 0.8 }}
-                              className="flex items-center space-x-2"
-                            >
-                              <Check size={16} />
-                              <span>Copiado com sucesso!</span>
-                            </motion.div>
-                          ) : (
-                            <motion.div 
-                              key="copy"
-                              initial={{ opacity: 0, scale: 0.8 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              exit={{ opacity: 0, scale: 0.8 }}
-                              className="flex items-center space-x-2"
-                            >
-                              <Copy size={16} />
-                              <span>Copiar Código Pix</span>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {sigiloPayResult.paymentLink && (
-                        <div className="w-full aspect-[3/4] bg-white rounded-xl border border-zinc-100 overflow-hidden">
-                          <iframe 
-                            src={sigiloPayResult.paymentLink} 
-                            className="w-full h-full border-none"
-                            title="Prévia do Boleto"
-                          />
+                  <div className="bg-zinc-50 p-4 rounded-xl border border-zinc-100 space-y-3">
+                    {sigiloPayResult.pixCode ? (
+                      <div className="space-y-3">
+                        <div className="w-32 h-32 bg-white p-2 rounded-lg mx-auto border border-zinc-100">
+                          <img src={sigiloPayResult.pixQrCode} alt="QR Code" className="w-full h-full" />
                         </div>
-                      )}
-                      <p className="font-mono text-[10px] text-zinc-600 break-all bg-white p-3 rounded-lg border border-zinc-100">
-                        {sigiloPayResult.barcode}
-                      </p>
-                      <div className="flex flex-col space-y-2">
+                        <div className="bg-white p-3 rounded-lg border border-zinc-100">
+                          {sigiloPayResult.pixCode && (
+                            <p className="text-[10px] text-zinc-400 font-mono break-all line-clamp-1 opacity-60 px-4 text-center mb-2">
+                              {sigiloPayResult.pixCode.substring(0, 25)}...{sigiloPayResult.pixCode.substring(sigiloPayResult.pixCode.length - 10)}
+                            </p>
+                          )}
+                        </div>
                         <button 
                           onClick={() => {
-                            navigator.clipboard.writeText(sigiloPayResult.barcode!);
-                            setCopied('barcode');
+                            navigator.clipboard.writeText(sigiloPayResult.pixCode!);
+                            setCopied('pix');
                             setTimeout(() => setCopied(null), 2000);
                           }}
                           className="flex items-center justify-center space-x-2 w-full text-[#008542] text-xs font-bold uppercase tracking-widest relative py-2"
                         >
                           <AnimatePresence mode="wait">
-                            {copied === 'barcode' ? (
+                            {copied === 'pix' ? (
                               <motion.div 
                                 key="copied"
                                 initial={{ opacity: 0, scale: 0.8 }}
@@ -1594,34 +1486,96 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
                                 className="flex items-center space-x-2"
                               >
                                 <Copy size={16} />
-                                <span>Copiar Código de Barras</span>
+                                <span>Copiar Código Pix</span>
                               </motion.div>
                             )}
                           </AnimatePresence>
                         </button>
-                        {sigiloPayResult.paymentLink && (
-                          <a 
-                            href={sigiloPayResult.paymentLink} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="flex items-center justify-center space-x-2 w-full bg-[#008542] text-white py-3 rounded-xl text-xs font-bold uppercase tracking-widest"
-                          >
-                            <Download size={16} />
-                            <span>Baixar PDF do Boleto</span>
-                          </a>
-                        )}
                       </div>
-                    </div>
-                  )}
-                </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {sigiloPayResult.paymentLink && (
+                          <div className="w-full aspect-[3/4] bg-white rounded-xl border border-zinc-100 overflow-hidden">
+                            <iframe 
+                              src={sigiloPayResult.paymentLink} 
+                              className="w-full h-full border-none"
+                              title="Prévia do Boleto"
+                            />
+                          </div>
+                        )}
+                        <p className="font-mono text-[10px] text-zinc-600 break-all bg-white p-3 rounded-lg border border-zinc-100">
+                          {sigiloPayResult.barcode}
+                        </p>
+                        <div className="flex flex-col space-y-2">
+                          <button 
+                            onClick={() => {
+                              navigator.clipboard.writeText(sigiloPayResult.barcode!);
+                              setCopied('barcode');
+                              setTimeout(() => setCopied(null), 2000);
+                            }}
+                            className="flex items-center justify-center space-x-2 w-full text-[#008542] text-xs font-bold uppercase tracking-widest relative py-2"
+                          >
+                            <AnimatePresence mode="wait">
+                              {copied === 'barcode' ? (
+                                <motion.div 
+                                  key="copied"
+                                  initial={{ opacity: 0, scale: 0.8 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  exit={{ opacity: 0, scale: 0.8 }}
+                                  className="flex items-center space-x-2"
+                                >
+                                  <Check size={16} />
+                                  <span>Copiado com sucesso!</span>
+                                </motion.div>
+                              ) : (
+                                <motion.div 
+                                  key="copy"
+                                  initial={{ opacity: 0, scale: 0.8 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  exit={{ opacity: 0, scale: 0.8 }}
+                                  className="flex items-center space-x-2"
+                                >
+                                  <Copy size={16} />
+                                  <span>Copiar Código de Barras</span>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
+                          </button>
+                          {sigiloPayResult.paymentLink && (
+                            <a 
+                              href={sigiloPayResult.paymentLink} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="flex items-center justify-center space-x-2 w-full bg-[#008542] text-white py-3 rounded-xl text-xs font-bold uppercase tracking-widest"
+                            >
+                              <Download size={16} />
+                              <span>Baixar PDF do Boleto</span>
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
-                <button 
-                  onClick={() => setSigiloPayResult(null)}
-                  className="w-full bg-zinc-900 text-white py-4 rounded-2xl font-bold shadow-xl"
-                >
-                  Fechar
-                </button>
-              </div>
+                  <div className="space-y-3">
+                    <button 
+                      onClick={() => {
+                        if (step === 3) finishContract('paid');
+                        setSigiloPayResult(null);
+                      }}
+                      className="w-full bg-zinc-900 text-white py-4 rounded-2xl font-bold shadow-xl"
+                    >
+                      Já realizei o pagamento
+                    </button>
+                    <button 
+                      onClick={() => setSigiloPayResult(null)}
+                      className="w-full text-zinc-400 py-2 text-xs font-bold uppercase tracking-widest"
+                    >
+                      Pagar depois
+                    </button>
+                  </div>
+                </div>
+              )}
             </motion.div>
           </div>
         )}
