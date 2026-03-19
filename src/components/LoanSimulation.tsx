@@ -641,7 +641,7 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
     });
 
     return () => unsubscribe();
-  }, [profile?.uid, sigiloPayResult, step]);
+  }, [profile?.uid, sigiloPayResult]);
 
   return (
     <div className="min-h-screen bg-white font-sans">
@@ -1383,7 +1383,6 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setSigiloPayResult(null)}
               className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             />
             <motion.div 
