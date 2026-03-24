@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { Settings, Users, FileText, Shield, Plus, Trash2, ArrowLeft, Edit2, Save, Check, X, TrendingUp, Download, Activity, Clock, BarChart3, PieChart, ArrowUpRight, ArrowDownRight, X as CloseIcon } from 'lucide-react';
+import { Settings, Users, FileText, Shield, Plus, Trash2, ArrowLeft, Edit2, Save, Check, X, TrendingUp, Download, Activity, Clock, BarChart3, PieChart, ArrowUpRight, ArrowDownRight, X as CloseIcon, Eye, EyeOff } from 'lucide-react';
 import { collection, onSnapshot, doc, updateDoc, deleteDoc, setDoc, getDoc, query, where, getDocs, deleteField } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { AppConfig, UserProfile, LoanProposal, RevenueRequest, FacialVerification as FVType } from '../types';
@@ -16,6 +16,7 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
   type TimeRange = 'today' | 'yesterday' | 'before_yesterday' | '7d' | 'all';
   const [globalRange, setGlobalRange] = useState<TimeRange>('all');
   const [showConversionLogic, setShowConversionLogic] = useState(false);
+  const [hideFees, setHideFees] = useState(false);
   const [onlineInterval, setOnlineInterval] = useState(5); // minutes
   const [cardRanges, setCardRanges] = useState({
     users: 'all' as TimeRange,
@@ -420,7 +421,7 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
       <aside className="w-full md:w-64 bg-white border-r border-zinc-200 p-6 space-y-8">
         <div className="space-y-1">
           <h1 className="text-xl font-bold">EmpireCred Admin</h1>
-          <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">v1.2.9</p>
+          <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">v1.3.0</p>
         </div>
         <nav className="space-y-2">
           <TabButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<TrendingUp size={18}/>} label="Dashboard" />
@@ -541,12 +542,22 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="p-6 bg-emerald-50 rounded-3xl space-y-2 border border-emerald-100">
+                  <div className="p-6 bg-emerald-50 rounded-3xl space-y-2 border border-emerald-100 relative group">
                     <div className="flex items-center justify-between">
                       <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Total em Taxas</p>
-                      <TrendingUp size={14} className="text-emerald-400" />
+                      <div className="flex items-center space-x-2">
+                        <button 
+                          onClick={() => setHideFees(!hideFees)}
+                          className="p-1 hover:bg-emerald-100 rounded-lg transition-colors text-emerald-600"
+                        >
+                          {hideFees ? <Eye size={14} /> : <EyeOff size={14} />}
+                        </button>
+                        <TrendingUp size={14} className="text-emerald-400" />
+                      </div>
                     </div>
-                    <p className="text-2xl font-bold text-emerald-900">R$ {getStats(cardRanges.revenue).totalFeesPaid.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                    <p className="text-2xl font-bold text-emerald-900">
+                      {hideFees ? 'R$ ••••••' : `R$ ${getStats(cardRanges.revenue).totalFeesPaid.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                    </p>
                   </div>
                   <div className="p-6 bg-blue-50 rounded-3xl space-y-2 border border-blue-100">
                     <div className="flex items-center justify-between">
