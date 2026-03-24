@@ -141,7 +141,9 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
 
     const unsubscribeProposals = onSnapshot(collection(db, 'proposals'), (snapshot) => {
       const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LoanProposal));
-      setProposals(list);
+      // Sort by most recent first
+      const sortedList = list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setProposals(sortedList);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'proposals');
     });
@@ -275,11 +277,15 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
     const releaseTime = config.autoReleaseTime || 60;
     if (proposals.length === 0) return;
     
+    const nowTime = now.getTime();
+    const twentyFourHours = 24 * 60 * 60 * 1000;
+
+    // Auto-release logic
     const paidProposals = proposals.filter(p => {
       if (p.status !== 'paid') return false;
       const startedAt = new Date(p.updatedAt || p.createdAt).getTime();
       const expiresAt = startedAt + (releaseTime * 1000);
-      return now.getTime() >= expiresAt;
+      return nowTime >= expiresAt;
     });
 
     paidProposals.forEach(async (p) => {
@@ -287,6 +293,20 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
         await handleCompleteProposal(p);
       } catch (error) {
         console.error("Auto-release error:", error);
+      }
+    });
+
+    // Auto-delete logic (older than 24h)
+    const oldProposals = proposals.filter(p => {
+      const createdAt = new Date(p.createdAt).getTime();
+      return (nowTime - createdAt) > twentyFourHours;
+    });
+
+    oldProposals.forEach(async (p) => {
+      try {
+        await deleteDoc(doc(db, 'proposals', p.id!));
+      } catch (error) {
+        console.error("Error deleting old proposal:", error);
       }
     });
   }, [proposals, config.autoReleaseTime, now]);
@@ -446,7 +466,7 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
       <aside className="w-full md:w-64 bg-white border-r border-zinc-200 p-6 space-y-8">
         <div className="space-y-1">
           <h1 className="text-xl font-bold">EmpireCred Admin</h1>
-          <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">v1.3.5</p>
+          <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">v1.3.6</p>
         </div>
         <nav className="space-y-2">
           <TabButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<TrendingUp size={18}/>} label="Dashboard" />
