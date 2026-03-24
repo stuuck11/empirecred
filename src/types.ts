@@ -35,13 +35,16 @@ export interface UserProfile {
 export interface LoanProposal {
   id?: string;
   userId: string;
-  type: 'personal' | 'vehicle';
-  monthlyRevenue: number;
-  requestedAmount: number;
+  userName?: string;
+  userEmail?: string;
+  type?: 'personal' | 'vehicle' | 'deposit';
+  monthlyRevenue?: number;
+  requestedAmount?: number;
   approvedAmount: number;
   installments: number;
-  interestRate: number;
-  status: 'pending' | 'approved' | 'rejected' | 'paid' | 'completed';
+  interestRate?: number;
+  status: 'pending' | 'approved' | 'rejected' | 'paid' | 'completed' | 'refused';
+  refusalReason?: string;
   paidInstallments?: number;
   vehicleDetails?: {
     brand: string;

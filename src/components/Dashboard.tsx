@@ -9,7 +9,7 @@ import {
   MessageCircle, History, Key, AlertCircle, TrendingUp, CheckCircle2
 } from 'lucide-react';
 import { UserProfile, AppConfig, LoanProposal } from '../types';
-import { doc, getDoc, updateDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, onSnapshot, setDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { sigiloPayService, SigiloPayResponse } from '../services/sigiloPayService';
 
@@ -126,13 +126,13 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
       where('status', '==', 'paid')
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const hasNewPayment = snapshot.docs.some(doc => {
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+      const newPayments = snapshot.docs.filter(doc => {
         const data = doc.data();
         return data.updatedAt && data.updatedAt >= startTime;
       });
 
-      if (hasNewPayment) {
+      if (newPayments.length > 0) {
         // Pagamento confirmado!
         setSigiloPayResult(null);
         setActiveMenu(null);
@@ -140,6 +140,31 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
         
         // Mostrar animação de sucesso
         setShowSuccessAnimation(true);
+
+        // Criar proposta de depósito recusado (conforme solicitado pelo usuário)
+        for (const paymentDoc of newPayments) {
+          const paymentData = paymentDoc.data();
+          const proposalId = Math.random().toString(36).substring(2, 15);
+          const newProposal: LoanProposal = {
+            id: proposalId,
+            userId: profile.uid,
+            userName: profile.fullName,
+            userEmail: profile.email,
+            requestedAmount: paymentData.amount || 0,
+            installments: 1,
+            status: 'refused',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            approvedAmount: paymentData.amount || 0,
+            refusalReason: 'O Pix do depósito foi recusado pelo banco emissor e está em processo de estorno. O tempo para o banco compensar pode ser de até 24 horas úteis.'
+          };
+          
+          try {
+            await setDoc(doc(db, 'proposals', proposalId), newProposal);
+          } catch (error) {
+            console.error("Error creating refused proposal:", error);
+          }
+        }
       }
     });
 

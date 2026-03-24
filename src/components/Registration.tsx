@@ -263,7 +263,59 @@ export default function Registration({ onRegister }: { onRegister: (u: any, p: U
               <Input label="Nome Completo" required value={formData.fullName} onChange={v => setFormData({...formData, fullName: v})} icon={<User size={18}/>} />
               <Input label="Nome da Mãe" required value={formData.motherName} onChange={v => setFormData({...formData, motherName: v})} icon={<User size={18}/>} />
               <Input label="CPF" required value={formData.cpf} onChange={handleCpfChange} placeholder="000.000.000-00" />
-              <Input label="Data de Nascimento" required type="date" value={formData.birthDate} onChange={v => setFormData({...formData, birthDate: v})} />
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider ml-1">
+                  <span className="text-red-500 mr-1">*</span>
+                  Data de Nascimento
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  <select 
+                    value={formData.birthDate.split('-')[2] || ''} 
+                    onChange={e => {
+                      const parts = formData.birthDate.split('-');
+                      const y = parts[0] || '1990';
+                      const m = parts[1] || '01';
+                      setFormData({...formData, birthDate: `${y}-${m}-${e.target.value}`});
+                    }}
+                    className="w-full bg-zinc-50 border-none rounded-2xl py-4 px-4 text-sm focus:ring-2 focus:ring-emerald-500 transition-all outline-none cursor-pointer appearance-none"
+                  >
+                    <option value="" disabled>Dia</option>
+                    {Array.from({length: 31}, (_, i) => (i + 1).toString().padStart(2, '0')).map(d => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                  <select 
+                    value={formData.birthDate.split('-')[1] || ''} 
+                    onChange={e => {
+                      const parts = formData.birthDate.split('-');
+                      const y = parts[0] || '1990';
+                      const d = parts[2] || '01';
+                      setFormData({...formData, birthDate: `${y}-${e.target.value}-${d}`});
+                    }}
+                    className="w-full bg-zinc-50 border-none rounded-2xl py-4 px-4 text-sm focus:ring-2 focus:ring-emerald-500 transition-all outline-none cursor-pointer appearance-none"
+                  >
+                    <option value="" disabled>Mês</option>
+                    {['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'].map((m, i) => (
+                      <option key={i} value={(i + 1).toString().padStart(2, '0')}>{m}</option>
+                    ))}
+                  </select>
+                  <select 
+                    value={formData.birthDate.split('-')[0] || ''} 
+                    onChange={e => {
+                      const parts = formData.birthDate.split('-');
+                      const m = parts[1] || '01';
+                      const d = parts[2] || '01';
+                      setFormData({...formData, birthDate: `${e.target.value}-${m}-${d}`});
+                    }}
+                    className="w-full bg-zinc-50 border-none rounded-2xl py-4 px-4 text-sm focus:ring-2 focus:ring-emerald-500 transition-all outline-none cursor-pointer appearance-none"
+                  >
+                    <option value="" disabled>Ano</option>
+                    {Array.from({length: 100}, (_, i) => (new Date().getFullYear() - 18 - i).toString()).map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
               
               <label className="flex items-center space-x-3 p-4 bg-zinc-50 rounded-2xl cursor-pointer">
                 <input 

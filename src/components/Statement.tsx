@@ -15,7 +15,7 @@ export default function Statement({ profile }: { profile: UserProfile }) {
     const q = query(
       collection(db, 'proposals'),
       where('userId', '==', profile.uid),
-      where('status', '==', 'completed')
+      where('status', 'in', ['completed', 'refused'])
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -109,16 +109,18 @@ Este documento serve como comprovante de operação financeira.
                   className="bg-white p-4 rounded-2xl border border-zinc-100 shadow-sm flex items-center justify-between cursor-pointer"
                 >
                   <div className="flex items-center space-x-4">
-                    <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600">
-                      <ArrowDownLeft size={24} />
+                    <div className={`w-12 h-12 ${p.status === 'refused' ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'} rounded-xl flex items-center justify-center`}>
+                      {p.status === 'refused' ? <X size={24} /> : <ArrowDownLeft size={24} />}
                     </div>
                     <div>
-                      <p className="text-sm font-bold text-zinc-900">Depósito Recebido</p>
+                      <p className="text-sm font-bold text-zinc-900">{p.status === 'refused' ? 'Depósito Recusado' : 'Depósito Recebido'}</p>
                       <p className="text-[10px] text-zinc-400 font-medium">Creditas Sociedade de Crédito Direto S/A</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-bold text-emerald-600">+ R$ {p.approvedAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                    <p className={`text-sm font-bold ${p.status === 'refused' ? 'text-red-600' : 'text-emerald-600'}`}>
+                      {p.status === 'refused' ? '- ' : '+ '} R$ {p.approvedAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
                     <p className="text-[10px] text-zinc-400">{new Date(p.createdAt).toLocaleDateString()}</p>
                   </div>
                 </motion.div>
@@ -166,9 +168,22 @@ Este documento serve como comprovante de operação financeira.
 
               <div className="space-y-6">
                 <div className="text-center space-y-2">
-                  <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Valor Recebido</p>
-                  <p className="text-4xl font-bold text-emerald-600">R$ {selectedTransaction.approvedAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                  <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest">
+                    {selectedTransaction.status === 'refused' ? 'Valor Recusado' : 'Valor Recebido'}
+                  </p>
+                  <p className={`text-4xl font-bold ${selectedTransaction.status === 'refused' ? 'text-red-500' : 'text-emerald-600'}`}>
+                    {selectedTransaction.status === 'refused' ? '-' : ''}R$ {selectedTransaction.approvedAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
                 </div>
+
+                {selectedTransaction.status === 'refused' && selectedTransaction.refusalReason && (
+                  <div className="bg-red-50 p-4 rounded-2xl border border-red-100">
+                    <p className="text-xs font-bold text-red-600 uppercase mb-2">Motivo da Recusa</p>
+                    <p className="text-sm text-red-700 font-medium leading-relaxed">
+                      {selectedTransaction.refusalReason}
+                    </p>
+                  </div>
+                )}
 
                 <div className="bg-zinc-50 rounded-2xl p-6 space-y-4">
                   <div className="flex justify-between items-center">

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { Settings, Users, FileText, Shield, Plus, Trash2, ArrowLeft, Edit2, Save, Check, X, TrendingUp, Download, Activity, Clock, BarChart3, PieChart, ArrowUpRight, ArrowDownRight, X as CloseIcon, Eye, EyeOff } from 'lucide-react';
+import { Settings, Users, FileText, Shield, Plus, Trash2, ArrowLeft, Edit2, Save, Check, X, TrendingUp, Download, Activity, Clock, BarChart3, PieChart, ArrowUpRight, ArrowDownRight, X as CloseIcon, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { collection, onSnapshot, doc, updateDoc, deleteDoc, setDoc, getDoc, query, where, getDocs, deleteField } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { AppConfig, UserProfile, LoanProposal, RevenueRequest, FacialVerification as FVType } from '../types';
@@ -363,6 +363,31 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
     }
   };
 
+  const handleTriggerRefusal = async (user: UserProfile) => {
+    try {
+      const proposalId = Math.random().toString(36).substring(2, 15);
+      const newProposal: LoanProposal = {
+        id: proposalId,
+        userId: user.uid,
+        userName: user.fullName,
+        userEmail: user.email,
+        requestedAmount: 100, // Valor padrão para teste
+        installments: 1,
+        status: 'refused',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        approvedAmount: 100,
+        refusalReason: 'O Pix do depósito foi recusado pelo banco emissor e está em processo de estorno. O tempo para o banco compensar pode ser de até 24 horas úteis.'
+      };
+      
+      await setDoc(doc(db, 'proposals', proposalId), newProposal);
+      // Usando console.log em vez de alert por ser um ambiente de iframe
+      console.log(`Notificação de recusa enviada para ${user.fullName}`);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'proposals');
+    }
+  };
+
   const handleUpdateUser = async () => {
     if (!editingUser) return;
     try {
@@ -421,7 +446,7 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
       <aside className="w-full md:w-64 bg-white border-r border-zinc-200 p-6 space-y-8">
         <div className="space-y-1">
           <h1 className="text-xl font-bold">EmpireCred Admin</h1>
-          <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">v1.3.3</p>
+          <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">v1.3.5</p>
         </div>
         <nav className="space-y-2">
           <TabButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<TrendingUp size={18}/>} label="Dashboard" />
@@ -766,6 +791,13 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
                       <td className="px-6 py-4">{u.email}</td>
                       <td className="px-6 py-4 font-bold text-emerald-600">R$ {u.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                       <td className="px-6 py-4 text-right space-x-2">
+                        <button 
+                          onClick={() => handleTriggerRefusal(u)} 
+                          className="text-zinc-400 hover:text-red-500"
+                          title="Simular Depósito Recusado"
+                        >
+                          <AlertCircle size={16} />
+                        </button>
                         <button onClick={() => setEditingUser(u)} className="text-zinc-400 hover:text-zinc-900">
                           <Edit2 size={16} />
                         </button>
