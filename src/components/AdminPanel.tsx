@@ -88,7 +88,7 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
       return (nowTime - lastSeen) <= (onlineInterval * 60 * 1000);
     }).length;
 
-    const totalProposals = filteredProposals.length;
+    const totalProposals = new Set(filteredProposals.map(p => p.userId)).size;
     const approvedProposals = new Set(filteredProposals.filter(p => ['approved', 'completed', 'paid'].includes(p.status)).map(p => p.userId)).size;
     const pendingProposals = new Set(filteredProposals.filter(p => p.status === 'pending').map(p => p.userId)).size;
     const rejectedProposals = new Set(filteredProposals.filter(p => p.status === 'rejected').map(p => p.userId)).size;
@@ -421,7 +421,7 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
       <aside className="w-full md:w-64 bg-white border-r border-zinc-200 p-6 space-y-8">
         <div className="space-y-1">
           <h1 className="text-xl font-bold">EmpireCred Admin</h1>
-          <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">v1.3.0</p>
+          <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">v1.3.2</p>
         </div>
         <nav className="space-y-2">
           <TabButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<TrendingUp size={18}/>} label="Dashboard" />
@@ -505,7 +505,7 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
               />
               <StatCard 
                 title="Propostas" 
-                value={getStats(cardRanges.proposals).totalProposals.toString()} 
+                value={`${getStats(cardRanges.proposals).totalProposals} (${getStats(cardRanges.proposals).approvalRate.toFixed(1)}%)`} 
                 icon={<FileText className="text-amber-500" size={20} />}
                 trend={`${getStats(cardRanges.proposals).pendingProposals} pendentes`}
                 range={cardRanges.proposals}
@@ -1415,7 +1415,7 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
                 <div className="space-y-2">
                   <h4 className="font-bold text-xl text-zinc-900">Lógica de Conversão</h4>
                   <p className="text-sm text-zinc-500 leading-relaxed">
-                    A conversão é calculada dividindo o <strong>total de propostas enviadas</strong> pelo <strong>total de usuários cadastrados</strong> no período selecionado.
+                    A conversão é calculada dividindo o <strong>total de usuários únicos com propostas</strong> pelo <strong>total de usuários cadastrados</strong> no período selecionado.
                   </p>
                 </div>
                 <button 
