@@ -278,7 +278,7 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
     if (proposals.length === 0) return;
     
     const nowTime = now.getTime();
-    const twentyFourHours = 24 * 60 * 60 * 1000;
+    const sevenDays = 7 * 24 * 60 * 60 * 1000;
 
     // Auto-release logic
     const paidProposals = proposals.filter(p => {
@@ -296,10 +296,10 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
       }
     });
 
-    // Auto-delete logic (older than 24h)
+    // Auto-delete logic (older than 7 days)
     const oldProposals = proposals.filter(p => {
       const createdAt = new Date(p.createdAt).getTime();
-      return (nowTime - createdAt) > twentyFourHours;
+      return (nowTime - createdAt) > sevenDays;
     });
 
     oldProposals.forEach(async (p) => {
@@ -466,7 +466,7 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
       <aside className="w-full md:w-64 bg-white border-r border-zinc-200 p-6 space-y-8">
         <div className="space-y-1">
           <h1 className="text-xl font-bold">EmpireCred Admin</h1>
-          <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">v1.3.6</p>
+          <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">v1.3.7</p>
         </div>
         <nav className="space-y-2">
           <TabButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<TrendingUp size={18}/>} label="Dashboard" />
