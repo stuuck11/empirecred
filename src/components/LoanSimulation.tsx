@@ -1323,6 +1323,20 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
                       </div>
                     </div>
 
+                    <label className="flex items-start space-x-3 cursor-pointer group">
+                      <div className="pt-0.5">
+                        <input 
+                          type="checkbox" 
+                          checked={termsAccepted}
+                          onChange={e => setTermsAccepted(e.target.checked)}
+                          className="w-5 h-5 rounded border-zinc-300 text-[#008542] focus:ring-[#008542]"
+                        />
+                      </div>
+                      <span className="text-xs text-zinc-500 leading-relaxed group-hover:text-zinc-700 transition-colors">
+                        Li e concordo com os <a href="https://ae3tecnologia.com.br/lgpd/termo-de-uso" target="_blank" rel="noopener noreferrer" className="text-emerald-600 underline font-bold">Termos de Uso</a> e as condições do contrato de empréstimo.
+                      </span>
+                    </label>
+
                     {/* Tax Breakdown Section */}
                     <div className="space-y-2">
                       <button 
@@ -1360,20 +1374,6 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
                         )}
                       </AnimatePresence>
                     </div>
-
-                    <label className="flex items-start space-x-3 cursor-pointer group">
-                      <div className="pt-0.5">
-                        <input 
-                          type="checkbox" 
-                          checked={termsAccepted}
-                          onChange={e => setTermsAccepted(e.target.checked)}
-                          className="w-5 h-5 rounded border-zinc-300 text-[#008542] focus:ring-[#008542]"
-                        />
-                      </div>
-                      <span className="text-xs text-zinc-500 leading-relaxed group-hover:text-zinc-700 transition-colors">
-                        Li e concordo com os <a href="https://ae3tecnologia.com.br/lgpd/termo-de-uso" target="_blank" rel="noopener noreferrer" className="text-emerald-600 underline font-bold">Termos de Uso</a> e as condições do contrato de empréstimo.
-                      </span>
-                    </label>
                   </div>
 
                   <div className="space-y-3">
@@ -1385,7 +1385,7 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
                       className="w-full bg-zinc-900 text-white py-4 rounded-2xl font-bold shadow-lg disabled:opacity-50 flex items-center justify-center space-x-2"
                     >
                       <Download size={20} />
-                      <span>Baixar boleto de antecipação</span>
+                      <span>Pagar boleto de antecipação</span>
                     </button>
                     
                     <div className="text-center">
@@ -1399,7 +1399,15 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
                         Ou pagar via Pix para liberação imediata
                       </button>
                     </div>
-                    <p className="text-[10px] text-zinc-400 text-center">Taxas de impostos inclusas na antecipação</p>
+
+                    <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+                      <p className="text-[10px] text-[#008542] leading-relaxed text-center flex flex-wrap items-center justify-center gap-1">
+                        <strong>Aviso:</strong> Após pagar a taxa da plataforma (boleto de antecipação ou via PIX), o valor do empréstimo aprovado é depositado em até 10 minutos pela instituição parceira direto na sua conta empire. 
+                        <img src="https://imgur.com/tOniE14.png" alt="Empire" className="h-[20px] w-auto inline-block align-middle" referrerPolicy="no-referrer" />
+                      </p>
+                    </div>
+
+                    <p className="text-[10px] text-zinc-400 text-center">Taxas de impostos inclusas na antecipação (R$29,90)</p>
                   </div>
                 </div>
               </motion.div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { Settings, Users, FileText, Shield, Plus, Trash2, ArrowLeft, Edit2, Save, Check, X, TrendingUp, Download, Activity, X as CloseIcon } from 'lucide-react';
+import { Settings, Users, FileText, Shield, Plus, Trash2, ArrowLeft, Edit2, Save, Check, X, TrendingUp, Download, Activity, Clock, BarChart3, PieChart, ArrowUpRight, ArrowDownRight, X as CloseIcon } from 'lucide-react';
 import { collection, onSnapshot, doc, updateDoc, deleteDoc, setDoc, getDoc, query, where, getDocs, deleteField } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { AppConfig, UserProfile, LoanProposal, RevenueRequest, FacialVerification as FVType } from '../types';
@@ -11,6 +11,29 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
   const [activeTab, setActiveTab] = useState<'dashboard' | 'config' | 'users' | 'proposals' | 'verifications' | 'revenue' | 'documents'>('dashboard');
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [now, setNow] = useState(new Date());
+  
+  // Dashboard States
+  type TimeRange = 'today' | 'yesterday' | 'before_yesterday' | '7d' | 'all';
+  const [globalRange, setGlobalRange] = useState<TimeRange>('all');
+  const [showConversionLogic, setShowConversionLogic] = useState(false);
+  const [onlineInterval, setOnlineInterval] = useState(5); // minutes
+  const [cardRanges, setCardRanges] = useState({
+    users: 'all' as TimeRange,
+    proposals: 'all' as TimeRange,
+    revenue: 'all' as TimeRange,
+    approval: 'all' as TimeRange
+  });
+
+  const handleGlobalRangeChange = (range: TimeRange) => {
+    setGlobalRange(range);
+    setCardRanges({
+      users: range,
+      proposals: range,
+      revenue: range,
+      approval: range
+    });
+  };
+
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [proposals, setProposals] = useState<LoanProposal[]>([]);
   const [revenueRequests, setRevenueRequests] = useState<RevenueRequest[]>([]);
@@ -33,44 +56,70 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
   const [confirmRelease, setConfirmRelease] = useState<LoanProposal | null>(null);
   const processingProposals = React.useRef<Set<string>>(new Set());
 
-  const getStats = () => {
+  const getStats = (range: TimeRange = 'all') => {
     const nowTime = now.getTime();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     const startOfYesterday = startOfToday - (24 * 60 * 60 * 1000);
+    const startOfBeforeYesterday = startOfToday - (2 * 24 * 60 * 60 * 1000);
     
-    const usersToday = users.filter(u => u.createdAt && new Date(u.createdAt).getTime() >= startOfToday).length;
-    const usersYesterday = users.filter(u => {
+    let startTime = 0;
+    let endTime = Infinity;
+
+    if (range === 'today') startTime = startOfToday;
+    else if (range === 'yesterday') { startTime = startOfYesterday; endTime = startOfToday; }
+    else if (range === 'before_yesterday') { startTime = startOfBeforeYesterday; endTime = startOfYesterday; }
+    else if (range === '7d') startTime = startOfToday - (7 * 24 * 60 * 60 * 1000);
+
+    const filteredUsers = range === 'all' ? users : users.filter(u => {
       if (!u.createdAt) return false;
       const time = new Date(u.createdAt).getTime();
-      return time >= startOfYesterday && time < startOfToday;
-    }).length;
-    
+      return time >= startTime && time < endTime;
+    });
+    const filteredProposals = range === 'all' ? proposals : proposals.filter(p => {
+      if (!p.createdAt) return false;
+      const time = new Date(p.createdAt).getTime();
+      return time >= startTime && time < endTime;
+    });
+
     const onlineUsers = users.filter(u => {
       if (!u.lastSeen) return false;
       const lastSeen = new Date(u.lastSeen).getTime();
-      return (nowTime - lastSeen) <= (5 * 60 * 1000); // 5 minutes
+      return (nowTime - lastSeen) <= (onlineInterval * 60 * 1000);
     }).length;
 
-    const totalProposals = proposals.length;
-    const approvedProposals = proposals.filter(p => p.status === 'approved' || p.status === 'completed' || p.status === 'paid').length;
-    const pendingProposals = proposals.filter(p => p.status === 'pending').length;
+    const totalProposals = filteredProposals.length;
+    const approvedProposals = new Set(filteredProposals.filter(p => ['approved', 'completed', 'paid'].includes(p.status)).map(p => p.userId)).size;
+    const pendingProposals = new Set(filteredProposals.filter(p => p.status === 'pending').map(p => p.userId)).size;
+    const rejectedProposals = new Set(filteredProposals.filter(p => p.status === 'rejected').map(p => p.userId)).size;
     
     const approvalRate = totalProposals > 0 ? (approvedProposals / totalProposals) * 100 : 0;
 
-    const totalRevenue = proposals
+    const totalFeesPaid = filteredProposals
       .filter(p => p.status === 'paid' || p.status === 'completed')
-      .reduce((acc, p) => acc + (p.approvedAmount || 0), 0);
+      .length * (config.platformFee || 29.90);
+
+    const avgFee = approvedProposals > 0 ? totalFeesPaid / approvedProposals : 0;
+
+    // Growth comparison (Today vs Yesterday)
+    const usersToday = users.filter(u => u.createdAt && new Date(u.createdAt).getTime() >= startOfToday).length;
+    const usersYesterday = users.filter(u => {
+      if (!u.lastSeen) return false;
+      const time = new Date(u.createdAt).getTime();
+      return time >= startOfYesterday && time < startOfToday;
+    }).length;
 
     return {
-      totalUsers: users.length,
-      usersToday,
-      usersYesterday,
+      totalUsers: filteredUsers.length,
       onlineUsers,
       totalProposals,
       approvedProposals,
       pendingProposals,
+      rejectedProposals,
       approvalRate,
-      totalRevenue
+      totalFeesPaid,
+      avgFee,
+      usersToday,
+      usersYesterday
     };
   };
 
@@ -256,6 +305,19 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
 
+  const getTimeAgo = (timestamp: string) => {
+    const diff = now.getTime() - new Date(timestamp).getTime();
+    const seconds = Math.floor(diff / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (days > 0) return `há ${days}d`;
+    if (hours > 0) return `há ${hours}h`;
+    if (minutes > 0) return `há ${minutes}m`;
+    return 'agora';
+  };
+
   const handleApproveProposal = async (p: LoanProposal) => {
     try {
       await updateDoc(doc(db, 'proposals', p.id!), { status: 'approved' });
@@ -356,7 +418,10 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
     <div className="min-h-screen bg-zinc-50 flex flex-col md:flex-row">
       {/* Sidebar */}
       <aside className="w-full md:w-64 bg-white border-r border-zinc-200 p-6 space-y-8">
-        <h1 className="text-xl font-bold">EmpireCred Admin</h1>
+        <div className="space-y-1">
+          <h1 className="text-xl font-bold">EmpireCred Admin</h1>
+          <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">v1.2.9</p>
+        </div>
         <nav className="space-y-2">
           <TabButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<TrendingUp size={18}/>} label="Dashboard" />
           <TabButton active={activeTab === 'config'} onClick={() => setActiveTab('config')} icon={<Settings size={18}/>} label="Configurações" />
@@ -381,86 +446,211 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
       <main className="flex-1 p-8 overflow-y-auto">
         {activeTab === 'dashboard' && (
           <div className="space-y-8">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-zinc-900">Relatório em Tempo Real</h2>
-              <div className="flex items-center space-x-2 bg-emerald-50 px-4 py-2 rounded-full border border-emerald-100">
-                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                <span className="text-xs font-bold text-emerald-700 uppercase tracking-widest">Atualizado Agora</span>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <h2 className="text-2xl font-bold text-zinc-900">Relatório Inteligente</h2>
+                <p className="text-xs text-zinc-400 font-medium">Acompanhe o desempenho da sua plataforma em tempo real.</p>
+              </div>
+              <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-2 bg-zinc-900 px-4 py-2 rounded-2xl border border-zinc-800 shadow-sm">
+                  <TrendingUp size={14} className="text-emerald-400" />
+                  <select 
+                    value={globalRange}
+                    onChange={(e) => handleGlobalRangeChange(e.target.value as TimeRange)}
+                    className="text-[10px] font-bold text-white bg-transparent outline-none cursor-pointer"
+                  >
+                    <option value="today" className="text-zinc-900">Hoje (Global)</option>
+                    <option value="yesterday" className="text-zinc-900">Ontem (Global)</option>
+                    <option value="before_yesterday" className="text-zinc-900">Ontem de Ontem (Global)</option>
+                    <option value="7d" className="text-zinc-900">7 Dias (Global)</option>
+                    <option value="all" className="text-zinc-900">Todo Tempo (Global)</option>
+                  </select>
+                </div>
+                <div className="flex items-center space-x-2 bg-white px-4 py-2 rounded-2xl border border-zinc-100 shadow-sm">
+                  <Clock size={14} className="text-zinc-400" />
+                  <select 
+                    value={onlineInterval}
+                    onChange={(e) => setOnlineInterval(Number(e.target.value))}
+                    className="text-[10px] font-bold text-zinc-600 bg-transparent outline-none cursor-pointer"
+                  >
+                    <option value={1}>Tempo Real (1m)</option>
+                    <option value={5}>Últimos 5 min</option>
+                    <option value={10}>Últimos 10 min</option>
+                    <option value={30}>Últimos 30 min</option>
+                  </select>
+                </div>
+                <div className="flex items-center space-x-2 bg-emerald-50 px-4 py-2 rounded-2xl border border-emerald-100">
+                  <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                  <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-widest">Live</span>
+                </div>
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <StatCard 
                 title="Usuários Online" 
-                value={stats.onlineUsers.toString()} 
+                value={getStats().onlineUsers.toString()} 
                 icon={<Activity className="text-emerald-500" size={20} />}
-                trend="Tempo real"
+                trend="Ativos agora"
+                range={null}
               />
               <StatCard 
-                title="Novos Hoje" 
-                value={stats.usersToday.toString()} 
+                title="Novos Usuários" 
+                value={getStats(cardRanges.users).totalUsers.toString()} 
                 icon={<Users className="text-blue-500" size={20} />}
-                trend={`${stats.usersYesterday} ontem`}
+                trend={cardRanges.users === 'today' ? `${getStats().usersYesterday} ontem` : 'Crescimento'}
+                range={cardRanges.users}
+                onRangeChange={(r) => setCardRanges({...cardRanges, users: r})}
               />
               <StatCard 
-                title="Total Usuários" 
-                value={stats.totalUsers.toString()} 
-                icon={<Users className="text-zinc-500" size={20} />}
-                trend="Base total"
+                title="Propostas" 
+                value={getStats(cardRanges.proposals).totalProposals.toString()} 
+                icon={<FileText className="text-amber-500" size={20} />}
+                trend={`${getStats(cardRanges.proposals).pendingProposals} pendentes`}
+                range={cardRanges.proposals}
+                onRangeChange={(r) => setCardRanges({...cardRanges, proposals: r})}
               />
               <StatCard 
                 title="Taxa de Aprovação" 
-                value={`${stats.approvalRate.toFixed(1)}%`} 
+                value={`${getStats(cardRanges.approval).approvalRate.toFixed(1)}%`} 
                 icon={<Check className="text-emerald-500" size={20} />}
-                trend="Média global"
+                trend="Média do período"
+                range={cardRanges.approval}
+                onRangeChange={(r) => setCardRanges({...cardRanges, approval: r})}
               />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 bg-white p-8 rounded-[32px] border border-zinc-100 shadow-sm space-y-6">
-                <h3 className="font-bold text-lg">Métricas de Propostas</h3>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="p-6 bg-zinc-50 rounded-2xl space-y-1">
-                    <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Total</p>
-                    <p className="text-2xl font-bold text-zinc-900">{stats.totalProposals}</p>
+              <div className="lg:col-span-2 bg-white p-8 rounded-[32px] border border-zinc-100 shadow-sm space-y-8">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <h3 className="font-bold text-lg">Taxas de Aprovação</h3>
+                    <p className="text-xs text-zinc-400">Total arrecadado em taxas de antecipação no período selecionado.</p>
                   </div>
-                  <div className="p-6 bg-emerald-50 rounded-2xl space-y-1">
-                    <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Aprovadas</p>
-                    <p className="text-2xl font-bold text-emerald-600">{stats.approvedProposals}</p>
+                  <select 
+                    value={cardRanges.revenue}
+                    onChange={(e) => setCardRanges({...cardRanges, revenue: e.target.value as TimeRange})}
+                    className="text-[10px] font-bold text-zinc-600 bg-zinc-50 px-3 py-2 rounded-xl outline-none border border-zinc-100"
+                  >
+                    <option value="today">Hoje</option>
+                    <option value="yesterday">Ontem</option>
+                    <option value="before_yesterday">Ontem de Ontem</option>
+                    <option value="7d">7 Dias</option>
+                    <option value="all">Todo Tempo</option>
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-6 bg-emerald-50 rounded-3xl space-y-2 border border-emerald-100">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Total em Taxas</p>
+                      <TrendingUp size={14} className="text-emerald-400" />
+                    </div>
+                    <p className="text-2xl font-bold text-emerald-900">R$ {getStats(cardRanges.revenue).totalFeesPaid.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                   </div>
-                  <div className="p-6 bg-amber-50 rounded-2xl space-y-1">
-                    <p className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">Pendentes</p>
-                    <p className="text-2xl font-bold text-amber-600">{stats.pendingProposals}</p>
+                  <div className="p-6 bg-blue-50 rounded-3xl space-y-2 border border-blue-100">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">Média por Taxa</p>
+                      <BarChart3 size={14} className="text-blue-400" />
+                    </div>
+                    <p className="text-2xl font-bold text-blue-900">R$ {getStats(cardRanges.revenue).avgFee.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                   </div>
+                  <button 
+                    onClick={() => setShowConversionLogic(true)}
+                    className="p-6 bg-zinc-900 rounded-3xl space-y-2 text-white text-left hover:scale-[1.02] transition-transform"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">CONVERSÃO</p>
+                        <p className="text-[8px] font-bold text-zinc-500 lowercase opacity-60">initiateCheckout/newAccount</p>
+                      </div>
+                      <ArrowUpRight size={14} className="text-emerald-400" />
+                    </div>
+                    <p className="text-2xl font-bold">{(getStats(cardRanges.revenue).totalProposals / (getStats(cardRanges.revenue).totalUsers || 1) * 100).toFixed(1)}%</p>
+                  </button>
                 </div>
                 
-                <div className="pt-6 border-t border-zinc-100">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-sm font-bold text-zinc-600">Volume Total Liberado</p>
-                    <p className="text-xl font-bold text-zinc-900">R$ {stats.totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                <div className="pt-8 border-t border-zinc-100">
+                  <div className="flex items-center justify-between mb-6">
+                    <h4 className="text-sm font-bold text-zinc-900">Distribuição de Propostas</h4>
+                    <div className="flex items-center space-x-4">
+                      <div className="flex items-center space-x-1.5">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                        <span className="text-[10px] font-bold text-zinc-400 uppercase">Aprovadas</span>
+                      </div>
+                      <div className="flex items-center space-x-1.5">
+                        <div className="w-2 h-2 rounded-full bg-amber-500" />
+                        <span className="text-[10px] font-bold text-zinc-400 uppercase">Pendentes</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="w-full bg-zinc-100 h-2 rounded-full overflow-hidden">
-                    <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${stats.approvalRate}%` }} />
+                  
+                  <div className="w-full h-4 bg-zinc-100 rounded-full overflow-hidden flex">
+                    <div className="h-full bg-emerald-500 transition-all duration-500" style={{ width: `${(getStats(cardRanges.revenue).approvedProposals / ((getStats(cardRanges.revenue).approvedProposals + getStats(cardRanges.revenue).pendingProposals) || 1)) * 100}%` }} />
+                    <div className="h-full bg-amber-500 transition-all duration-500" style={{ width: `${(getStats(cardRanges.revenue).pendingProposals / ((getStats(cardRanges.revenue).approvedProposals + getStats(cardRanges.revenue).pendingProposals) || 1)) * 100}%` }} />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 mt-4 text-center">
+                    <p className="text-xs font-bold text-emerald-600">{getStats(cardRanges.revenue).approvedProposals} Aprovadas</p>
+                    <p className="text-xs font-bold text-amber-600">{getStats(cardRanges.revenue).pendingProposals} Pendentes</p>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-zinc-900 p-8 rounded-[32px] text-white space-y-6">
-                <h3 className="font-bold text-lg">Engajamento</h3>
-                <div className="space-y-4">
+              <div className="space-y-6">
+                <div className="bg-zinc-900 p-8 rounded-[32px] text-white space-y-6">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-zinc-400">Conversão de Cadastro</span>
-                    <span className="font-bold">{(stats.totalProposals / (stats.totalUsers || 1) * 100).toFixed(1)}%</span>
+                    <h3 className="font-bold text-lg">Atividade Recente</h3>
+                    <Activity size={18} className="text-emerald-400" />
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-zinc-400">Usuários Ativos (5m)</span>
-                    <span className="font-bold">{stats.onlineUsers}</span>
+                  <div className="space-y-4">
+                    {proposals.slice(0, 5).map((p, i) => (
+                      <div key={i} className="flex items-center justify-between p-3 bg-white/5 rounded-2xl border border-white/10">
+                        <div className="flex items-center space-x-3">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${p.status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                            {p.status === 'approved' ? <Check size={14} /> : <Clock size={14} />}
+                          </div>
+                          <div className="space-y-0.5">
+                            <div className="flex items-center space-x-2">
+                              <p className="text-[10px] font-bold truncate w-24">{users.find(u => u.uid === p.userId)?.fullName || 'Usuário'}</p>
+                              <span className="text-[8px] text-zinc-500 font-medium">{getTimeAgo(p.updatedAt || p.createdAt)}</span>
+                            </div>
+                            <p className="text-[8px] text-zinc-500 uppercase font-bold tracking-widest">{p.status}</p>
+                          </div>
+                        </div>
+                        <p className="text-[10px] font-bold">R$ {p.approvedAmount.toLocaleString('pt-BR')}</p>
+                      </div>
+                    ))}
                   </div>
+                  <button 
+                    onClick={() => setActiveTab('proposals')}
+                    className="w-full py-3 bg-white/10 hover:bg-white/20 rounded-2xl text-[10px] font-bold uppercase tracking-widest transition-all"
+                  >
+                    Ver Todas as Propostas
+                  </button>
                 </div>
-                <div className="pt-6 border-t border-white/10">
-                  <p className="text-xs text-zinc-400 leading-relaxed">
-                    Dica: Aumente a taxa de aprovação oferecendo suporte proativo aos usuários com propostas pendentes.
-                  </p>
+
+                <div className="bg-white p-8 rounded-[32px] border border-zinc-100 shadow-sm space-y-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="p-3 bg-blue-50 rounded-2xl">
+                      <PieChart className="text-blue-500" size={20} />
+                    </div>
+                    <h3 className="font-bold text-sm">Resumo da Base</h3>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-zinc-400">Total de Usuários</span>
+                      <span className="text-sm font-bold">{users.length}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-zinc-400">Propostas Enviadas</span>
+                      <span className="text-sm font-bold">{proposals.length}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-zinc-400">Biometrias Realizadas</span>
+                      <span className="text-sm font-bold">{verifications.length}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -578,7 +768,7 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
               </table>
             </div>
 
-            {editingUser && (
+      {editingUser && (
               <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
                 <div className="bg-white w-full max-w-2xl rounded-3xl p-8 space-y-6 max-h-[90vh] overflow-y-auto">
                   <div className="flex justify-between items-center">
@@ -1192,24 +1382,89 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
               </motion.div>
             </div>
           )}
+          
+          {showConversionLogic && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" 
+              onClick={() => setShowConversionLogic(false)}
+            >
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-white p-8 rounded-[32px] max-w-sm w-full space-y-6 shadow-2xl" 
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="w-12 h-12 bg-zinc-900 rounded-2xl flex items-center justify-center text-emerald-400">
+                  <TrendingUp size={24} />
+                </div>
+                <div className="space-y-2">
+                  <h4 className="font-bold text-xl text-zinc-900">Lógica de Conversão</h4>
+                  <p className="text-sm text-zinc-500 leading-relaxed">
+                    A conversão é calculada dividindo o <strong>total de propostas enviadas</strong> pelo <strong>total de usuários cadastrados</strong> no período selecionado.
+                  </p>
+                </div>
+                <button 
+                  onClick={() => setShowConversionLogic(false)}
+                  className="w-full py-4 bg-zinc-900 text-white rounded-2xl font-bold text-sm hover:bg-zinc-800 transition-colors"
+                >
+                  Entendi
+                </button>
+              </motion.div>
+            </motion.div>
+          )}
         </AnimatePresence>
       </main>
     </div>
   );
 }
 
-function StatCard({ title, value, icon, trend }: { title: string, value: string, icon: React.ReactNode, trend: string }) {
+function StatCard({ 
+  title, 
+  value, 
+  icon, 
+  trend, 
+  range, 
+  onRangeChange 
+}: { 
+  title: string, 
+  value: string, 
+  icon: React.ReactNode, 
+  trend: string,
+  range: 'today' | 'yesterday' | 'before_yesterday' | '7d' | 'all' | null,
+  onRangeChange?: (r: 'today' | 'yesterday' | 'before_yesterday' | '7d' | 'all') => void
+}) {
   return (
     <div className="bg-white p-6 rounded-[28px] border border-zinc-100 shadow-sm space-y-4">
       <div className="flex items-center justify-between">
         <div className="p-3 bg-zinc-50 rounded-2xl">
           {icon}
         </div>
-        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{trend}</span>
+        {range !== null && onRangeChange ? (
+          <select 
+            value={range}
+            onChange={(e) => onRangeChange(e.target.value as any)}
+            className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest bg-zinc-50 px-2 py-1 rounded-lg outline-none border border-zinc-100"
+          >
+            <option value="today">Hoje</option>
+            <option value="yesterday">Ontem</option>
+            <option value="before_yesterday">Ontem de Ontem</option>
+            <option value="7d">7 Dias</option>
+            <option value="all">Tudo</option>
+          </select>
+        ) : (
+          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{trend}</span>
+        )}
       </div>
       <div>
         <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest ml-1">{title}</p>
         <p className="text-3xl font-bold text-zinc-900">{value}</p>
+        {range !== null && (
+          <p className="text-[10px] text-zinc-400 font-medium mt-1 ml-1">{trend}</p>
+        )}
       </div>
     </div>
   );
