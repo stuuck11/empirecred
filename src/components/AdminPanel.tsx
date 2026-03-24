@@ -421,7 +421,7 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
       <aside className="w-full md:w-64 bg-white border-r border-zinc-200 p-6 space-y-8">
         <div className="space-y-1">
           <h1 className="text-xl font-bold">EmpireCred Admin</h1>
-          <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">v1.3.2</p>
+          <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">v1.3.3</p>
         </div>
         <nav className="space-y-2">
           <TabButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<TrendingUp size={18}/>} label="Dashboard" />
@@ -505,7 +505,7 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
               />
               <StatCard 
                 title="Propostas" 
-                value={`${getStats(cardRanges.proposals).totalProposals} (${getStats(cardRanges.proposals).approvalRate.toFixed(1)}%)`} 
+                value={getStats(cardRanges.proposals).totalProposals.toString()} 
                 icon={<FileText className="text-amber-500" size={20} />}
                 trend={`${getStats(cardRanges.proposals).pendingProposals} pendentes`}
                 range={cardRanges.proposals}
