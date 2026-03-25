@@ -642,38 +642,61 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
   }, [sigiloPayResult]);
 
   useEffect(() => {
-    if (!profile || !sigiloPayResult) return;
+    if (!profile?.uid) return;
 
-    // Monitorar pagamentos confirmados do usuário
-    // Se tivermos externalId, monitoramos apenas esse pagamento específico
-    // Caso contrário, monitoramos qualquer pagamento pago criado após agora (fallback)
-    const q = sigiloPayResult.externalId 
-      ? query(
-          collection(db, 'payments'),
-          where('userId', '==', profile.uid),
-          where('externalId', '==', sigiloPayResult.externalId),
-          where('status', '==', 'paid')
-        )
-      : query(
-          collection(db, 'payments'),
-          where('userId', '==', profile.uid),
-          where('status', '==', 'paid'),
-          where('createdAt', '>=', new Date().toISOString())
-        );
+    // Monitorar pagamentos confirmados do usuário de forma persistente
+    const startTime = new Date().toISOString();
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      if (!snapshot.empty) {
-        // Pagamento confirmado!
-        console.log("Payment confirmed via Snapshot!");
-        setPaymentConfirmed(true);
-        
-        // Se estivermos no passo 3 (contratação), finalizamos o contrato como pago
-        // Mas NÃO fechamos o modal automaticamente agora, deixamos o usuário ver a confirmação
+    const q = query(
+      collection(db, 'payments'),
+      where('userId', '==', profile.uid),
+      where('status', '==', 'paid')
+    );
+
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+      const newPayments = snapshot.docs.filter(doc => {
+        const data = doc.data();
+        return data.updatedAt && data.updatedAt >= startTime;
+      });
+
+      if (newPayments.length > 0) {
+        for (const paymentDoc of newPayments) {
+          const paymentData = paymentDoc.data();
+          
+          // Se for taxa de antecipação, atualizamos a proposta
+          if (paymentData.description?.includes("Taxa de Antecipação")) {
+            console.log("Loan fee payment detected:", paymentDoc.id);
+            setPaymentConfirmed(true);
+
+            // Buscar proposta pendente para atualizar
+            const qProp = query(
+              collection(db, 'proposals'),
+              where('userId', '==', profile.uid),
+              where('status', '==', 'pending'),
+              orderBy('createdAt', 'desc'),
+              limit(1)
+            );
+            
+            try {
+              const propSnap = await getDocs(qProp);
+              if (!propSnap.empty) {
+                const propDoc = propSnap.docs[0];
+                await updateDoc(propDoc.ref, {
+                  status: 'paid',
+                  updatedAt: new Date().toISOString()
+                });
+                console.log("Proposal updated to paid:", propDoc.id);
+              }
+            } catch (error) {
+              console.error("Error updating proposal after payment:", error);
+            }
+          }
+        }
       }
     });
 
     return () => unsubscribe();
-  }, [profile?.uid, sigiloPayResult]);
+  }, [profile?.uid]);
 
   return (
     <div className="min-h-screen bg-white font-sans">

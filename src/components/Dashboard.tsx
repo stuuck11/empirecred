@@ -9,7 +9,7 @@ import {
   MessageCircle, History, Key, AlertCircle, TrendingUp, CheckCircle2
 } from 'lucide-react';
 import { UserProfile, AppConfig, LoanProposal } from '../types';
-import { doc, getDoc, updateDoc, collection, query, where, getDocs, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, onSnapshot, setDoc, orderBy, limit } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import { sigiloPayService, SigiloPayResponse } from '../services/sigiloPayService';
 
@@ -143,35 +143,68 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
           setShowSuccessAnimation(true);
         }
         
-        // Criar proposta de depósito recusado para cada novo pagamento detectado
+        // Processar cada novo pagamento detectado
         for (const paymentDoc of newPayments) {
-          // Usamos o ID do pagamento para evitar duplicatas (idempotência)
-          const proposalId = `refused_${paymentDoc.id}`;
-          
-          // Verificar se já existe uma proposta com este ID
-          const proposalDoc = await getDoc(doc(db, 'proposals', proposalId));
-          if (proposalDoc.exists()) continue;
-
           const paymentData = paymentDoc.data();
-          const newProposal: LoanProposal = {
-            id: proposalId,
-            userId: profile.uid,
-            userName: profile.fullName,
-            userEmail: profile.email,
-            requestedAmount: paymentData.amount || 0,
-            installments: 1,
-            status: 'refused',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            approvedAmount: paymentData.amount || 0,
-            refusalReason: 'O Pix do depósito foi recusado pelo banco emissor e está em processo de estorno. O tempo para o banco compensar pode ser de até 24 horas úteis.'
-          };
           
-          try {
-            await setDoc(doc(db, 'proposals', proposalId), newProposal);
-            console.log("Refused deposit created for payment:", paymentDoc.id);
-          } catch (error) {
-            console.error("Error creating refused proposal:", error);
+          // CASO 1: Depósito em conta (resulta em recusa conforme regra de negócio)
+          if (paymentData.description?.includes("Depósito em conta")) {
+            // Usamos o ID externo ou o ID do documento para evitar duplicatas (idempotência)
+            const paymentId = paymentData.externalId || paymentData.identifier || paymentDoc.id;
+            const proposalId = `refused_${paymentId}`;
+            
+            // Verificar se já existe uma proposta com este ID
+            const proposalDoc = await getDoc(doc(db, 'proposals', proposalId));
+            if (!proposalDoc.exists()) {
+              const newProposal: LoanProposal = {
+                id: proposalId,
+                userId: profile.uid,
+                userName: profile.fullName,
+                userEmail: profile.email,
+                requestedAmount: paymentData.amount || 0,
+                installments: 1,
+                status: 'refused',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                approvedAmount: paymentData.amount || 0,
+                refusalReason: 'O Pix do depósito foi recusado pelo banco emissor e está em processo de estorno. O tempo para o banco compensar pode ser de até 24 horas úteis.'
+              };
+              
+              try {
+                await setDoc(doc(db, 'proposals', proposalId), newProposal);
+                console.log("Refused deposit created for payment:", paymentDoc.id);
+              } catch (error) {
+                console.error("Error creating refused proposal:", error);
+              }
+            }
+          }
+
+          // CASO 2: Taxa de Antecipação de Empréstimo
+          if (paymentData.description?.includes("Taxa de Antecipação")) {
+            console.log("Loan fee payment detected in Dashboard:", paymentDoc.id);
+            
+            // Buscar proposta pendente para atualizar
+            const qProp = query(
+              collection(db, 'proposals'),
+              where('userId', '==', profile.uid),
+              where('status', '==', 'pending'),
+              orderBy('createdAt', 'desc'),
+              limit(1)
+            );
+            
+            try {
+              const propSnap = await getDocs(qProp);
+              if (!propSnap.empty) {
+                const propDoc = propSnap.docs[0];
+                await updateDoc(propDoc.ref, {
+                  status: 'paid',
+                  updatedAt: new Date().toISOString()
+                });
+                console.log("Proposal updated to paid from Dashboard:", propDoc.id);
+              }
+            } catch (error) {
+              console.error("Error updating proposal from Dashboard:", error);
+            }
           }
         }
       }

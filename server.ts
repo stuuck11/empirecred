@@ -17,6 +17,7 @@ import {
   getDocs, 
   doc, 
   getDoc, 
+  setDoc,
   updateDoc, 
   orderBy, 
   limit 
@@ -413,11 +414,11 @@ async function startServer() {
         let userId = metadata?.userId || body.userId || transaction.userId;
         let amount = webhookAmount;
         let description = metadata?.description;
+        let paymentDoc: any = null;
 
         // 1. Tentar encontrar o pagamento pelo externalId ou identifier
         if (externalId || identifier) {
           const paymentsRef = collection(db, 'payments');
-          let paymentDoc = null;
           
           // Busca por externalId (ID da transação no SigiloPay)
           if (externalId) {
@@ -475,49 +476,70 @@ async function startServer() {
 
         console.log(`[Webhook] Final userId to update: ${userId}`);
 
-        // Se for um depósito, atualiza o saldo do usuário
+        // Se for um depósito, cria proposta de recusa (conforme regra de negócio solicitada)
         if (description && (description.includes('Depósito') || description.includes('Saldo'))) {
-          const userRef = doc(db, 'users', userId);
-          const userDoc = await getDoc(userRef);
-          if (userDoc.exists()) {
-            const currentBalance = userDoc.data()?.balance || 0;
-            const depositAmount = Number(amount) || 0;
-            await updateDoc(userRef, {
-              balance: currentBalance + depositAmount,
-              updatedAt: new Date().toISOString()
-            });
-            console.log(`[Webhook] User ${userId} balance updated: +${depositAmount}`);
+          console.log(`[Webhook] Deposit detected for user ${userId}. Creating refused proposal.`);
+          
+          // Usamos o ID externo ou o ID do documento para evitar duplicatas (idempotência)
+          const paymentId = externalId || identifier || (paymentDoc ? paymentDoc.id : Date.now());
+          const proposalId = `refused_${paymentId}`;
+          
+          // Verificar se já existe uma proposta com este ID
+          const proposalDoc = await getDoc(doc(db, 'proposals', proposalId));
+          if (!proposalDoc.exists()) {
+            const userRef = doc(db, 'users', userId);
+            const userDoc = await getDoc(userRef);
+            const userData = userDoc.data();
+
+            const newProposal = {
+              id: proposalId,
+              userId: userId,
+              userName: userData?.fullName || 'Usuário',
+              userEmail: userData?.email || '',
+              requestedAmount: Number(amount) || 0,
+              installments: 1,
+              status: 'refused',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              approvedAmount: Number(amount) || 0,
+              refusalReason: 'O Pix do depósito foi recusado pelo banco emissor e está em processo de estorno. O tempo para o banco compensar pode ser de até 24 horas úteis.'
+            };
+            
+            await setDoc(doc(db, 'proposals', proposalId), newProposal);
+            console.log(`[Webhook] Refused deposit proposal created: ${proposalId}`);
           }
+          
+          // NÃO atualizamos o saldo para depósitos recusados
+          return res.status(200).send('OK (Deposit Refused)');
         }
         
-        // Atualizar proposta para "paid"
-        console.log(`[Webhook] Searching proposals for userId: ${userId}`);
-        const proposalsQuery = query(
-          collection(db, 'proposals'),
-          where('userId', '==', userId)
-        );
-        const proposalsSnapshot = await getDocs(proposalsQuery);
+        // Se for Taxa de Antecipação, atualizar proposta para "paid"
+        if (description && description.includes('Taxa')) {
+          console.log(`[Webhook] Loan fee detected for user ${userId}. Updating pending proposal.`);
+          const proposalsQuery = query(
+            collection(db, 'proposals'),
+            where('userId', '==', userId),
+            where('status', '==', 'pending')
+          );
+          const proposalsSnapshot = await getDocs(proposalsQuery);
 
-        if (!proposalsSnapshot.empty) {
-          // Ordenar em memória para evitar a necessidade de índice composto no Firestore
-          const sortedDocs = [...proposalsSnapshot.docs].sort((a, b) => {
-            const dateA = new Date(a.data().createdAt || 0).getTime();
-            const dateB = new Date(b.data().createdAt || 0).getTime();
-            return dateB - dateA;
-          });
-          
-          const targetProposal = sortedDocs.find(d => !['paid', 'completed'].includes(d.data().status));
-          if (targetProposal) {
+          if (!proposalsSnapshot.empty) {
+            // Ordenar em memória para pegar a mais recente
+            const sortedDocs = [...proposalsSnapshot.docs].sort((a, b) => {
+              const dateA = new Date(a.data().createdAt || 0).getTime();
+              const dateB = new Date(b.data().createdAt || 0).getTime();
+              return dateB - dateA;
+            });
+            
+            const targetProposal = sortedDocs[0];
             await updateDoc(targetProposal.ref, {
               status: 'paid',
               updatedAt: new Date().toISOString()
             });
             console.log(`[Webhook] Proposal ${targetProposal.id} updated to paid.`);
           } else {
-            console.log(`[Webhook] No active proposal found to update for user ${userId}`);
+            console.log(`[Webhook] No pending proposal found to update for user ${userId}`);
           }
-        } else {
-          console.log(`[Webhook] No proposals found for user ${userId}`);
         }
       }
 
