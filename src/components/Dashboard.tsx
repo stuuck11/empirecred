@@ -39,7 +39,7 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
   // Deposit States
   const [depositAmount, setDepositAmount] = useState('');
   const [depositMethod, setDepositMethod] = useState<'pix' | 'boleto' | null>(null);
-  const [depositStep, setDepositStep] = useState<'amount' | 'method' | 'result'>('amount');
+  const [depositStep, setDepositStep] = useState<'amount' | 'method' | 'result' | 'error'>('amount');
   const [sigiloPayResult, setSigiloPayResult] = useState<SigiloPayResponse | null>(null);
   const [isGeneratingPayment, setIsGeneratingPayment] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
@@ -106,6 +106,7 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
       }
       
       if (!response.success) {
+        setSigiloPayResult(response);
         setDepositStep('error');
         return;
       }
@@ -114,6 +115,7 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
       setDepositStep('result');
     } catch (err: any) {
       console.error("SigiloPay Error:", err);
+      setSigiloPayResult({ success: false, error: err.message });
       setDepositStep('error');
     } finally {
       setIsGeneratingPayment(false);
@@ -153,11 +155,11 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
         for (const paymentDoc of newPayments) {
           const paymentData = paymentDoc.data();
           
-          // CASO 1: Depósito em conta (resulta em recusa conforme regra de negócio)
+          // CASO 1: Depósito em conta (resulta em aprovação e atualização de saldo)
           if (paymentData.description?.includes("Depósito em conta")) {
             // Usamos o ID externo ou o ID do documento para evitar duplicatas (idempotência)
             const paymentId = paymentData.externalId || paymentData.identifier || paymentDoc.id;
-            const proposalId = `refused_${paymentId}`;
+            const proposalId = `deposit_${paymentId}`;
             
             // Verificar se já existe uma proposta com este ID
             const proposalDoc = await getDoc(doc(db, 'proposals', proposalId));
@@ -169,18 +171,26 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
                 userEmail: profile.email,
                 requestedAmount: paymentData.amount || 0,
                 installments: 1,
-                status: 'refused',
+                status: 'completed',
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
                 approvedAmount: paymentData.amount || 0,
-                refusalReason: 'O Pix do depósito foi recusado pelo banco emissor e está em processo de estorno. O tempo para o banco compensar pode ser de até 24 horas úteis.'
+                refusalReason: ''
               };
               
               try {
+                // Criar registro da transação concluída
                 await setDoc(doc(db, 'proposals', proposalId), newProposal);
-                console.log("Refused deposit created for payment:", paymentDoc.id);
+                
+                // Atualizar saldo do usuário
+                const userRef = doc(db, 'users', profile.uid);
+                await updateDoc(userRef, {
+                  balance: (profile.balance || 0) + (paymentData.amount || 0)
+                });
+                
+                console.log("Deposit approved and balance updated for payment:", paymentDoc.id);
               } catch (error) {
-                console.error("Error creating refused proposal:", error);
+                console.error("Error processing successful deposit:", error);
               }
             }
           }
@@ -823,6 +833,26 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
                     className="w-full bg-zinc-900 text-white py-4 rounded-2xl font-bold shadow-xl"
                   >
                     Concluído
+                  </button>
+                </div>
+              )}
+
+              {depositStep === 'error' && (
+                <div className="space-y-6 text-center">
+                  <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto text-red-500">
+                    <AlertCircle size={40} />
+                  </div>
+                  <div className="space-y-2">
+                    <h4 className="font-bold text-zinc-900">Erro ao Gerar Pagamento</h4>
+                    <p className="text-sm text-zinc-500 leading-relaxed">
+                      {sigiloPayResult?.error || "Ocorreu um erro inesperado ao processar seu depósito. Por favor, tente novamente mais tarde."}
+                    </p>
+                  </div>
+                  <button 
+                    onClick={() => setDepositStep('method')}
+                    className="w-full bg-zinc-900 text-white py-4 rounded-2xl font-bold shadow-xl"
+                  >
+                    Tentar Novamente
                   </button>
                 </div>
               )}
