@@ -38,7 +38,7 @@ COMPROVANTE DE DEPÓSITO - EMPIRECRED
 ------------------------------------
 ID: ${transaction.id}
 DATA: ${new Date(transaction.createdAt).toLocaleString()}
-VALOR: R$ ${transaction.approvedAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+VALOR: R$ ${(transaction.approvedAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
 ORIGEM: Creditas Sociedade de Crédito Direto S/A
 CNPJ: 32.997.490/0001-39
 TIPO: Crédito em Conta
@@ -76,7 +76,7 @@ Este documento serve como comprovante de operação financeira.
         <div className="space-y-1">
           <p className="text-xs opacity-80 uppercase font-bold tracking-widest">Saldo disponível</p>
           <h2 className="text-3xl font-bold">
-            R$ {profile.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            R$ {(profile.balance || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </h2>
         </div>
       </header>

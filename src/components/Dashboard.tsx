@@ -89,10 +89,15 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
   };
 
   const handleGenerateDeposit = async (method: 'pix' | 'boleto') => {
+    const amount = parseFloat(depositAmount);
+    if (isNaN(amount) || amount <= 0) {
+      alert("Por favor, insira um valor válido para o depósito.");
+      return;
+    }
+
     setIsGeneratingPayment(true);
     setDepositMethod(method);
     try {
-      const amount = parseFloat(depositAmount);
       let response: SigiloPayResponse;
       if (method === 'pix') {
         response = await sigiloPayService.generatePix(amount, `Depósito em conta - ${profile.fullName}`, profile.uid);
@@ -101,14 +106,15 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
       }
       
       if (!response.success) {
-        throw new Error(response.error || "Erro ao gerar pagamento");
+        setDepositStep('error');
+        return;
       }
 
       setSigiloPayResult(response);
       setDepositStep('result');
     } catch (err: any) {
       console.error("SigiloPay Error:", err);
-      alert(err.message || "Erro ao gerar pagamento. Tente novamente.");
+      setDepositStep('error');
     } finally {
       setIsGeneratingPayment(false);
     }
@@ -271,7 +277,7 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
           </div>
           <div className="mb-6">
             <h2 className="text-3xl font-bold text-zinc-900">
-              {showBalance ? `R$ ${profile.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '••••••'}
+              {showBalance ? `R$ ${(profile.balance || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '••••••'}
             </h2>
             <div className="flex items-center space-x-1 mt-1">
               <TrendingUp size={12} className="text-emerald-500" />
@@ -723,7 +729,7 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
                   </div>
                   <div className="space-y-2">
                     <h4 className="font-bold text-zinc-900">Pagamento Gerado</h4>
-                    <p className="text-sm text-zinc-500">Realize o pagamento de R$ {parseFloat(depositAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} para concluir o depósito.</p>
+                    <p className="text-sm text-zinc-500">Realize o pagamento de R$ {(parseFloat(depositAmount) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} para concluir o depósito.</p>
                   </div>
                   
                   <div className="bg-zinc-50 p-6 rounded-2xl border border-zinc-100">
@@ -1049,7 +1055,7 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
                       <div className="space-y-2">
                         <h4 className="font-bold text-zinc-900 text-lg">Solicitação em Análise</h4>
                         <p className="text-sm text-zinc-500 leading-relaxed">
-                          Sua solicitação de R$ {Number(ccAmount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} está em análise.
+                          Sua solicitação de R$ {(Number(ccAmount) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} está em análise.
                         </p>
                         <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl">
                           <p className="text-xs text-amber-700 font-medium leading-relaxed">

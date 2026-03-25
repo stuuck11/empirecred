@@ -268,7 +268,7 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
 
   useEffect(() => {
     if (profile?.monthlyRevenue !== undefined) {
-      const val = profile.monthlyRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const val = (profile.monthlyRevenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       setRevenue(val);
       setIsEditingRevenue(profile.monthlyRevenue === 0);
     }
@@ -945,7 +945,7 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
                     >
                       <p className="text-xs text-zinc-500 mb-1">Faturamento informado</p>
                       <p className="text-2xl font-bold text-zinc-900">
-                        R$ {profile.monthlyRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        R$ {(profile?.monthlyRevenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                     </motion.div>
                   )}
@@ -1014,7 +1014,7 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
                               <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
                                 {p.type === 'personal' ? 'Empréstimo Pessoal' : 'Crédito com Garantia'}
                               </p>
-                              <p className="font-bold text-zinc-900">R$ {p.approvedAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                              <p className="font-bold text-zinc-900">R$ {(p.approvedAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                             </div>
                             <div className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${
                               p.status === 'approved' ? 'bg-emerald-50 text-emerald-600' :
@@ -1047,7 +1047,7 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
                           )}
 
                           <div className="flex justify-between text-[10px] text-zinc-500">
-                            <span>{p.installments}x de R$ {(p.approvedAmount * (1 + p.interestRate/100) / p.installments).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            <span>{p.installments}x de R$ {((p.approvedAmount || 0) * (1 + (p.interestRate || 0)/100) / (p.installments || 1)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                             <span className="text-emerald-600 font-bold">
                               {p.installments - (p.paidInstallments || 0)} parcelas restantes
                             </span>
@@ -1096,7 +1096,7 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
                                         <span className="text-zinc-500">Parcela {idx + 1}</span>
                                       </div>
                                       <div className="flex items-center space-x-3">
-                                        <span className="font-bold text-zinc-900">R$ {(p.approvedAmount * (1 + p.interestRate/100) / p.installments).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        <span className="font-bold text-zinc-900">R$ {((p.approvedAmount || 0) * (1 + (p.interestRate || 0)/100) / (p.installments || 1)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                         {idx < (p.paidInstallments || 0) ? (
                                           <span className="text-emerald-600 font-bold uppercase text-[8px]">Pago</span>
                                         ) : (
@@ -1157,7 +1157,7 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
                 <div className="bg-emerald-50 p-6 rounded-2xl flex items-center justify-between border border-emerald-100">
                   <div className="space-y-1">
                     <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Faturamento Informado</p>
-                    <p className="font-bold text-emerald-900">R$ {profile?.monthlyRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                    <p className="font-bold text-emerald-900">R$ {(profile?.monthlyRevenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                   </div>
                   <div className="bg-emerald-500 text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase">Aprovado</div>
                 </div>

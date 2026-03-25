@@ -133,7 +133,18 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
 
   useEffect(() => {
     const unsubscribeUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
-      const usersList = snapshot.docs.map(doc => ({ ...doc.data() } as UserProfile));
+      const usersList = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          uid: doc.id,
+          balance: data.balance || 0,
+          role: data.role || 'user',
+          fullName: data.fullName || '',
+          cpf: data.cpf || '',
+          email: data.email || ''
+        } as UserProfile;
+      });
       setUsers(usersList);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'users');
@@ -466,7 +477,7 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
       <aside className="w-full md:w-64 bg-white border-r border-zinc-200 p-6 space-y-8">
         <div className="space-y-1">
           <h1 className="text-xl font-bold">EmpireCred Admin</h1>
-          <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">v1.3.9</p>
+          <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">v1.4.0</p>
         </div>
         <nav className="space-y-2">
           <TabButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<TrendingUp size={18}/>} label="Dashboard" />
@@ -601,7 +612,7 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
                       </div>
                     </div>
                     <p className="text-2xl font-bold text-emerald-900">
-                      {hideFees ? 'R$ ••••••' : `R$ ${getStats(cardRanges.revenue).totalFeesPaid.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                      {hideFees ? 'R$ ••••••' : `R$ ${(getStats(cardRanges.revenue).totalFeesPaid || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                     </p>
                   </div>
                   <div className="p-6 bg-blue-50 rounded-3xl space-y-2 border border-blue-100">
@@ -609,7 +620,7 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
                       <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">Média por Taxa</p>
                       <BarChart3 size={14} className="text-blue-400" />
                     </div>
-                    <p className="text-2xl font-bold text-blue-900">R$ {getStats(cardRanges.revenue).avgFee.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                    <p className="text-2xl font-bold text-blue-900">R$ {(getStats(cardRanges.revenue).avgFee || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                   </div>
                   <button 
                     onClick={() => setShowConversionLogic(true)}
@@ -674,7 +685,7 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
                             <p className="text-[8px] text-zinc-500 uppercase font-bold tracking-widest">{p.status}</p>
                           </div>
                         </div>
-                        <p className="text-[10px] font-bold">R$ {p.approvedAmount.toLocaleString('pt-BR')}</p>
+                        <p className="text-[10px] font-bold">R$ {(p.approvedAmount || 0).toLocaleString('pt-BR')}</p>
                       </div>
                     ))}
                   </div>
@@ -809,7 +820,7 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
                       <td className="px-6 py-4 font-bold">{u.fullName}</td>
                       <td className="px-6 py-4 font-mono">{u.cpf}</td>
                       <td className="px-6 py-4">{u.email}</td>
-                      <td className="px-6 py-4 font-bold text-emerald-600">R$ {u.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="px-6 py-4 font-bold text-emerald-600">R$ {(u.balance || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                       <td className="px-6 py-4 text-right space-x-2">
                         <button 
                           onClick={() => handleTriggerRefusal(u)} 
@@ -939,7 +950,7 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
                         </div>
                         <div className="space-y-1">
                           <p className="text-xs text-zinc-500 uppercase font-bold">Faturamento Declarado</p>
-                          <p className="text-xl font-bold text-emerald-600">R$ {r.revenue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                          <p className="text-xl font-bold text-emerald-600">R$ {(r.revenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                         </div>
                         
                         {(r.status === 'pending' || r.status === 'waiting_proof') && config.revenueAnalysisTime && (
@@ -1064,7 +1075,7 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
                             <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 text-center space-y-1">
                               <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Valor Pago (Taxa)</p>
                               <p className="text-2xl font-bold text-emerald-900">R$ {(config.platformFee || 29.90).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                              <p className="text-[10px] text-emerald-600 mt-1">Valor Solicitado: R$ {p.approvedAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                              <p className="text-[10px] text-emerald-600 mt-1">Valor Solicitado: R$ {(p.approvedAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                             </div>
                             <button 
                               onClick={() => setConfirmRelease(p)}
@@ -1079,7 +1090,7 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
                             <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 text-center space-y-1">
                               <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">Status do Saldo</p>
                               <p className="text-xl font-bold text-blue-900">Saldo Liberado</p>
-                              <p className="text-[10px] text-blue-600 mt-1">Valor: R$ {p.approvedAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                              <p className="text-[10px] text-blue-600 mt-1">Valor: R$ {(p.approvedAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                             </div>
                             {proposalFilter === 'paid' && (
                               <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-100 text-center">
@@ -1091,7 +1102,7 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
                         ) : (
                           <div className="space-y-1">
                             <p className="text-xs text-zinc-500 uppercase font-bold">Valor Solicitado</p>
-                            <p className="text-xl font-bold">R$ {p.approvedAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                            <p className="text-xl font-bold">R$ {(p.approvedAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                           </div>
                         )}
 
@@ -1160,7 +1171,7 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
                     </div>
                     <div className="space-y-1">
                       <p className="text-xs text-zinc-500 uppercase font-bold">Faturamento Declarado</p>
-                      <p className="text-xl font-bold text-emerald-600">R$ {r.revenue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                      <p className="text-xl font-bold text-emerald-600">R$ {(r.revenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                     </div>
                     
                     <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-100 space-y-2">
@@ -1337,7 +1348,7 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
                   <div className="space-y-2">
                     <h3 className="text-xl font-bold text-zinc-900">Liberar Saldo</h3>
                     <p className="text-sm text-zinc-500 leading-relaxed">
-                      Deseja liberar o saldo de <span className="font-bold text-zinc-900">R$ {confirmRelease.approvedAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span> para o usuário? O valor será adicionado instantaneamente ao saldo da conta.
+                      Deseja liberar o saldo de <span className="font-bold text-zinc-900">R$ {(confirmRelease.approvedAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span> para o usuário? O valor será adicionado instantaneamente ao saldo da conta.
                     </p>
                   </div>
                 </div>

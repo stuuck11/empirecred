@@ -76,7 +76,17 @@ export default function App() {
         const profileRef = doc(db, 'users', firebaseUser.uid);
         unsubscribeProfile = onSnapshot(profileRef, (docSnap) => {
           if (docSnap.exists()) {
-            setProfile(docSnap.data() as UserProfile);
+            const data = docSnap.data();
+            setProfile({
+              ...data,
+              uid: firebaseUser.uid,
+              balance: data.balance || 0,
+              role: data.role || 'user',
+              fullName: data.fullName || '',
+              cpf: data.cpf || '',
+              email: data.email || firebaseUser.email || '',
+              createdAt: data.createdAt || new Date().toISOString()
+            } as UserProfile);
           } else {
             setProfile(null);
           }
