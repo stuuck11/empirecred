@@ -115,11 +115,12 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
   };
 
   useEffect(() => {
-    if (!profile || !sigiloPayResult) return;
-
-    const startTime = new Date().toISOString();
+    if (!profile?.uid) return;
 
     // Monitorar pagamentos confirmados do usuário
+    // Usamos um timestamp para pegar apenas pagamentos novos desde que o componente montou
+    const startTime = new Date().toISOString();
+
     const q = query(
       collection(db, 'payments'),
       where('userId', '==', profile.uid),
@@ -129,22 +130,29 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
     const unsubscribe = onSnapshot(q, async (snapshot) => {
       const newPayments = snapshot.docs.filter(doc => {
         const data = doc.data();
+        // Apenas pagamentos confirmados após a montagem do componente
         return data.updatedAt && data.updatedAt >= startTime;
       });
 
       if (newPayments.length > 0) {
-        // Pagamento confirmado!
-        setSigiloPayResult(null);
-        setActiveMenu(null);
-        setDepositStep('amount');
+        // Se o modal de depósito estiver aberto, fechamos e limpamos
+        if (sigiloPayResult) {
+          setSigiloPayResult(null);
+          setActiveMenu(null);
+          setDepositStep('amount');
+          setShowSuccessAnimation(true);
+        }
         
-        // Mostrar animação de sucesso
-        setShowSuccessAnimation(true);
-
-        // Criar proposta de depósito recusado (conforme solicitado pelo usuário)
+        // Criar proposta de depósito recusado para cada novo pagamento detectado
         for (const paymentDoc of newPayments) {
+          // Usamos o ID do pagamento para evitar duplicatas (idempotência)
+          const proposalId = `refused_${paymentDoc.id}`;
+          
+          // Verificar se já existe uma proposta com este ID
+          const proposalDoc = await getDoc(doc(db, 'proposals', proposalId));
+          if (proposalDoc.exists()) continue;
+
           const paymentData = paymentDoc.data();
-          const proposalId = Math.random().toString(36).substring(2, 15);
           const newProposal: LoanProposal = {
             id: proposalId,
             userId: profile.uid,
@@ -161,6 +169,7 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
           
           try {
             await setDoc(doc(db, 'proposals', proposalId), newProposal);
+            console.log("Refused deposit created for payment:", paymentDoc.id);
           } catch (error) {
             console.error("Error creating refused proposal:", error);
           }
@@ -169,7 +178,7 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
     });
 
     return () => unsubscribe();
-  }, [profile?.uid, sigiloPayResult]);
+  }, [profile?.uid]); // Removido sigiloPayResult da dependência para manter o listener ativo
 
   return (
     <div className="min-h-screen bg-[#F5F7F9] pb-24 font-sans">
