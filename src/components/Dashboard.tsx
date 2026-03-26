@@ -687,12 +687,13 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
                       <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-[#008542]">
                         {isGeneratingPayment && depositMethod === 'pix' ? (
                           <motion.div 
+                            key="spinner-pix"
                             animate={{ rotate: 360 }}
                             transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                             className="w-6 h-6 border-2 border-[#008542] border-t-transparent rounded-full"
                           />
                         ) : (
-                          <QrCode size={24} />
+                          <QrCode key="icon-pix" size={24} />
                         )}
                       </div>
                       <div className="text-left">
@@ -709,12 +710,13 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
                       <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-[#008542]">
                         {isGeneratingPayment && depositMethod === 'boleto' ? (
                           <motion.div 
+                            key="spinner-boleto"
                             animate={{ rotate: 360 }}
                             transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                             className="w-6 h-6 border-2 border-[#008542] border-t-transparent rounded-full"
                           />
                         ) : (
-                          <Receipt size={24} />
+                          <Receipt key="icon-boleto" size={24} />
                         )}
                       </div>
                       <div className="text-left">
@@ -769,6 +771,7 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
                           <AnimatePresence>
                             {copied === 'pix' && (
                               <motion.div 
+                                key="copied-badge-pix"
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -10 }}
@@ -798,6 +801,7 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
                           <AnimatePresence>
                             {copied === 'boleto' && (
                               <motion.div 
+                                key="copied-badge-boleto"
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -10 }}
