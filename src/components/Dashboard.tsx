@@ -91,9 +91,15 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
   const handleGenerateDeposit = async (method: 'pix' | 'boleto') => {
     if (isGeneratingPayment) return;
 
+    if (!profile || !profile.uid) {
+      setSigiloPayResult({ success: false, error: "Sessão inválida. Por favor, saia e entre novamente. [ERR-DEP-001]" });
+      setDepositStep('error');
+      return;
+    }
+
     const amount = parseFloat(depositAmount);
     if (isNaN(amount) || amount <= 0) {
-      setSigiloPayResult({ success: false, error: "Por favor, insira um valor válido para o depósito." });
+      setSigiloPayResult({ success: false, error: "Por favor, insira um valor válido para o depósito. [ERR-DEP-002]" });
       setDepositStep('error');
       return;
     }
@@ -101,15 +107,19 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
     setIsGeneratingPayment(true);
     setDepositMethod(method);
     try {
+      if (!sigiloPayService) {
+        throw new Error("Serviço de pagamento indisponível. [ERR-DEP-003]");
+      }
+
       let response: SigiloPayResponse;
       if (method === 'pix') {
-        response = await sigiloPayService.generatePix(amount, `Depósito em conta - ${profile.fullName}`, profile.uid);
+        response = await sigiloPayService.generatePix(amount, `Depósito em conta - ${profile.fullName || 'Cliente'}`, profile.uid);
       } else {
-        response = await sigiloPayService.generateBoleto(amount, `Depósito em conta - ${profile.fullName}`, profile.uid);
+        response = await sigiloPayService.generateBoleto(amount, `Depósito em conta - ${profile.fullName || 'Cliente'}`, profile.uid);
       }
       
-      if (!response.success) {
-        setSigiloPayResult(response);
+      if (!response || !response.success) {
+        setSigiloPayResult(response || { success: false, error: "Falha na resposta do servidor. [ERR-DEP-004]" });
         setDepositStep('error');
         return;
       }
@@ -119,8 +129,8 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
     } catch (err: any) {
       console.error("SigiloPay Error:", err);
       const errorMessage = err.message === 'Failed to fetch' 
-        ? "Erro de conexão. Verifique sua internet e tente novamente."
-        : (err.message || "Ocorreu um erro ao processar seu depósito.");
+        ? "Erro de conexão. Verifique sua internet e tente novamente. [ERR-DEP-005]"
+        : (err.message || "Ocorreu um erro ao processar seu depósito. [ERR-DEP-006]");
       
       setSigiloPayResult({ success: false, error: errorMessage });
       setDepositStep('error');

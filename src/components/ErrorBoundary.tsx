@@ -31,15 +31,18 @@ class ErrorBoundary extends React.Component<Props, State> {
     const { children } = (this as any).props;
     if ((this as any).state.hasError) {
       let errorMessage = "Ocorreu um erro inesperado.";
+      let errorDetail = (this as any).state.error?.message || "";
       
       try {
         // Check if it's a Firestore error JSON
-        const parsed = JSON.parse((this as any).state.error?.message || "");
+        const parsed = JSON.parse(errorDetail);
         if (parsed.error && parsed.operationType) {
-          errorMessage = `Erro de permissão no banco de dados (${parsed.operationType}). Por favor, contate o suporte.`;
+          errorMessage = `Erro de permissão no banco de dados (${parsed.operationType}). Por favor, contate o suporte. [ERR-DB-001]`;
+          errorDetail = parsed.error;
         }
       } catch (e) {
         // Not a JSON error
+        errorMessage = `Erro interno do aplicativo. [ERR-APP-001]`;
       }
 
       return (
@@ -51,6 +54,11 @@ class ErrorBoundary extends React.Component<Props, State> {
             <div className="space-y-2">
               <h2 className="text-xl font-bold text-zinc-900">Ops! Algo deu errado</h2>
               <p className="text-zinc-500 text-sm">{errorMessage}</p>
+              {errorDetail && (
+                <p className="text-[10px] text-zinc-400 font-mono break-all opacity-50 mt-2">
+                  Detalhe: {errorDetail.substring(0, 100)}
+                </p>
+              )}
             </div>
             <button 
               onClick={() => window.location.reload()}
