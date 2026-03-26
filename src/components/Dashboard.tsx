@@ -89,9 +89,12 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
   };
 
   const handleGenerateDeposit = async (method: 'pix' | 'boleto') => {
+    if (isGeneratingPayment) return;
+
     const amount = parseFloat(depositAmount);
     if (isNaN(amount) || amount <= 0) {
-      alert("Por favor, insira um valor válido para o depósito.");
+      setSigiloPayResult({ success: false, error: "Por favor, insira um valor válido para o depósito." });
+      setDepositStep('error');
       return;
     }
 
@@ -115,7 +118,11 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
       setDepositStep('result');
     } catch (err: any) {
       console.error("SigiloPay Error:", err);
-      setSigiloPayResult({ success: false, error: err.message });
+      const errorMessage = err.message === 'Failed to fetch' 
+        ? "Erro de conexão. Verifique sua internet e tente novamente."
+        : (err.message || "Ocorreu um erro ao processar seu depósito.");
+      
+      setSigiloPayResult({ success: false, error: errorMessage });
       setDepositStep('error');
     } finally {
       setIsGeneratingPayment(false);
@@ -695,11 +702,20 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
                   <p className="text-sm text-zinc-500">Escolha a forma de depósito:</p>
                   <div className="space-y-3">
                     <button 
+                      disabled={isGeneratingPayment}
                       onClick={() => handleGenerateDeposit('pix')}
-                      className="w-full p-6 bg-zinc-50 rounded-2xl border border-zinc-100 flex items-center space-x-4 hover:bg-zinc-100 transition-colors"
+                      className="w-full p-6 bg-zinc-50 rounded-2xl border border-zinc-100 flex items-center space-x-4 hover:bg-zinc-100 transition-colors disabled:opacity-50"
                     >
                       <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-[#008542]">
-                        <QrCode size={24} />
+                        {isGeneratingPayment && depositMethod === 'pix' ? (
+                          <motion.div 
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                            className="w-6 h-6 border-2 border-[#008542] border-t-transparent rounded-full"
+                          />
+                        ) : (
+                          <QrCode size={24} />
+                        )}
                       </div>
                       <div className="text-left">
                         <p className="font-bold text-zinc-900">Pix</p>
@@ -708,11 +724,20 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
                     </button>
 
                     <button 
+                      disabled={isGeneratingPayment}
                       onClick={() => handleGenerateDeposit('boleto')}
-                      className="w-full p-6 bg-zinc-50 rounded-2xl border border-zinc-100 flex items-center space-x-4 hover:bg-zinc-100 transition-colors"
+                      className="w-full p-6 bg-zinc-50 rounded-2xl border border-zinc-100 flex items-center space-x-4 hover:bg-zinc-100 transition-colors disabled:opacity-50"
                     >
                       <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-[#008542]">
-                        <Receipt size={24} />
+                        {isGeneratingPayment && depositMethod === 'boleto' ? (
+                          <motion.div 
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                            className="w-6 h-6 border-2 border-[#008542] border-t-transparent rounded-full"
+                          />
+                        ) : (
+                          <Receipt size={24} />
+                        )}
                       </div>
                       <div className="text-left">
                         <p className="font-bold text-zinc-900">Boleto</p>
