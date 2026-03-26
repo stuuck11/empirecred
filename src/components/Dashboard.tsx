@@ -172,38 +172,6 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
         for (const paymentDoc of newPayments) {
           const paymentData = paymentDoc.data();
           
-          // CASO 1: Depósito em conta (resulta em recusa conforme regra de negócio solicitada)
-          if (paymentData.description?.includes("Depósito em conta")) {
-            // Usamos o ID externo ou o ID do documento para evitar duplicatas (idempotência)
-            const paymentId = paymentData.externalId || paymentData.identifier || paymentDoc.id;
-            const proposalId = `refused_${paymentId}`;
-            
-            // Verificar se já existe uma proposta com este ID
-            const proposalDoc = await getDoc(doc(db, 'proposals', proposalId));
-            if (!proposalDoc.exists()) {
-              const newProposal: LoanProposal = {
-                id: proposalId,
-                userId: profile.uid,
-                userName: profile.fullName,
-                userEmail: profile.email,
-                requestedAmount: paymentData.amount || 0,
-                installments: 1,
-                status: 'refused',
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-                approvedAmount: paymentData.amount || 0,
-                refusalReason: 'O Pix do depósito foi recusado pelo banco emissor e está em processo de estorno. O tempo para o banco compensar pode ser de até 24 horas úteis.'
-              };
-              
-              try {
-                await setDoc(doc(db, 'proposals', proposalId), newProposal);
-                console.log("Refused deposit created for payment (as requested):", paymentDoc.id);
-              } catch (error) {
-                console.error("Error creating refused proposal:", error);
-              }
-            }
-          }
-
           // CASO 2: Taxa de Antecipação de Empréstimo
           if (paymentData.description?.includes("Taxa de Antecipação")) {
             console.log("Loan fee payment detected in Dashboard:", paymentDoc.id);
