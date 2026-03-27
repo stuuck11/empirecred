@@ -163,11 +163,7 @@ export default function LandingPage({ onLogin }: LandingPageProps) {
                 {loading ? (
                   <div className="flex items-center justify-center space-x-2">
                     <div className="relative w-5 h-5">
-                      <motion.div 
-                        className="absolute inset-0 border-2 border-white/20 border-t-white rounded-full"
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                      />
+                      <div className="absolute inset-0 border-2 border-white/20 border-t-white rounded-full animate-spin" />
                     </div>
                     <span>Entrando...</span>
                   </div>

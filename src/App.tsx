@@ -39,10 +39,8 @@ function PageLoader() {
         <div className="relative w-20 h-20">
           {/* The "spinning green bar" */}
           <div className="absolute inset-0 border-[3px] border-emerald-500/20 rounded-full"></div>
-          <motion.div 
-            className="absolute inset-0 border-[3px] border-emerald-500 border-t-transparent rounded-full"
-            animate={{ rotate: 360 }}
-            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+          <div 
+            className="absolute inset-0 border-[3px] border-emerald-500 border-t-transparent rounded-full animate-spin"
           />
         </div>
         <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.2em] animate-pulse">Carregando...</p>
@@ -60,6 +58,13 @@ export default function App() {
   const [pinVerified, setPinVerified] = useState(false);
 
   useEffect(() => {
+    const safetyTimeout = setTimeout(() => {
+      if (loading) {
+        console.warn("Auth check taking too long, forcing loading to false. [ERR-AUTH-001]");
+        setLoading(false);
+      }
+    }, 10000); // 10 seconds safety
+
     let unsubscribeProfile: (() => void) | null = null;
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -103,6 +108,7 @@ export default function App() {
     });
 
     return () => {
+      clearTimeout(safetyTimeout);
       unsubscribeAuth();
       if (unsubscribeProfile) unsubscribeProfile();
     };
@@ -147,10 +153,8 @@ export default function App() {
         <div className="flex flex-col items-center space-y-4">
           <div className="relative w-20 h-20">
             <div className="absolute inset-0 border-[3px] border-emerald-500/20 rounded-full"></div>
-            <motion.div 
-              className="absolute inset-0 border-[3px] border-emerald-500 border-t-transparent rounded-full"
-              animate={{ rotate: 360 }}
-              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+            <div 
+              className="absolute inset-0 border-[3px] border-emerald-500 border-t-transparent rounded-full animate-spin"
             />
           </div>
           <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.2em] animate-pulse">Carregando EmpireCred...</p>

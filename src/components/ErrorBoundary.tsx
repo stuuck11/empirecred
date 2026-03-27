@@ -1,5 +1,4 @@
-import * as React from 'react';
-import { ErrorInfo, ReactNode } from 'react';
+import React, { Component, ErrorInfo, ReactNode } from 'react';
 
 interface Props {
   children: ReactNode;
@@ -10,7 +9,7 @@ interface State {
   error: Error | null;
 }
 
-class ErrorBoundary extends React.Component<Props, State> {
+class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
     (this as any).state = {
@@ -29,9 +28,11 @@ class ErrorBoundary extends React.Component<Props, State> {
 
   public render() {
     const { children } = (this as any).props;
-    if ((this as any).state.hasError) {
+    const { hasError, error } = (this as any).state;
+
+    if (hasError) {
       let errorMessage = "Ocorreu um erro inesperado.";
-      let errorDetail = (this as any).state.error?.message || "";
+      let errorDetail = error?.message || "";
       
       try {
         // Check if it's a Firestore error JSON
