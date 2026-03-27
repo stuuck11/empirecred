@@ -35,7 +35,8 @@
           "type": "array",
           "items": { "type": "string" }
         },
-        "creditBannerUrl": { "type": "string" }
+        "creditBannerUrl": { "type": "string" },
+        "whatsappNumber": { "type": "string", "description": "WhatsApp support number" }
       }
     },
     "Payment": {

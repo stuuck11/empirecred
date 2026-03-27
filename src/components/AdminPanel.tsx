@@ -47,7 +47,8 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
     ],
     creditBannerUrl: 'https://picsum.photos/seed/credit/800/400',
     platformFee: 29.90,
-    autoReleaseTime: 60
+    autoReleaseTime: 60,
+    whatsappNumber: '5511957978342'
   });
   const [proposalFilter, setProposalFilter] = useState<'pending' | 'approved' | 'rejected' | 'waiting_proof' | 'paid' | 'completed'>('pending');
   const [confirmDelete, setConfirmDelete] = useState<{ type: 'user' | 'revenue' | 'proposal', id: string, data?: any } | null>(null);
@@ -477,7 +478,7 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
       <aside className="w-full md:w-64 bg-white border-r border-zinc-200 p-6 space-y-8">
         <div className="space-y-1">
           <h1 className="text-xl font-bold">EmpireCred Admin</h1>
-          <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">v1.6.8</p>
+          <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">v1.6.9</p>
         </div>
         <nav className="space-y-2">
           <TabButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<TrendingUp size={18}/>} label="Dashboard" />
@@ -774,6 +775,16 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
                   step="0.01"
                   value={config.platformFee || 29.90}
                   onChange={e => updateConfig({ platformFee: parseFloat(e.target.value) || 0 })}
+                  className="w-full bg-zinc-50 border-none rounded-xl py-3 px-4 text-xs outline-none"
+                />
+              </div>
+              <div className="space-y-2">
+                <p className="font-bold text-sm">WhatsApp de Suporte (DDI + DDD + Número)</p>
+                <input 
+                  type="text" 
+                  value={config.whatsappNumber || ''}
+                  onChange={e => updateConfig({ whatsappNumber: e.target.value.replace(/\D/g, '') })}
+                  placeholder="Ex: 5511999999999"
                   className="w-full bg-zinc-50 border-none rounded-xl py-3 px-4 text-xs outline-none"
                 />
               </div>

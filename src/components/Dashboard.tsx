@@ -966,7 +966,7 @@ export default function Dashboard({ profile, onLogout, setProfile }: { profile: 
                 </div>
 
                 <button 
-                  onClick={() => window.open('https://wa.me/5511957978342', '_blank')}
+                  onClick={() => window.open(`https://wa.me/${config?.whatsappNumber || '5511957978342'}`, '_blank')}
                   className="w-full bg-[#25D366] text-white py-4 rounded-2xl font-bold shadow-lg flex items-center justify-center space-x-2"
                 >
                   <MessageCircle size={20} />

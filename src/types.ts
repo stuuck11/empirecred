@@ -91,4 +91,5 @@ export interface AppConfig {
   storyImages?: string[];
   storyLogo?: string;
   platformFee?: number;
+  whatsappNumber?: string;
 }
