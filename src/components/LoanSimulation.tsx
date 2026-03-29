@@ -407,7 +407,7 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
 
   const handleSimulate = () => {
     const rev = parseCurrency(revenue);
-    const req = parseFloat(requestedAmount);
+    const req = parseCurrency(requestedAmount);
     
     if (!requestedAmount || isNaN(req) || req < 500) {
       setAnalyzing(true);
@@ -544,7 +544,7 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
           userId: profile.uid,
           type: type as 'personal' | 'vehicle',
           monthlyRevenue: parseCurrency(revenue),
-          requestedAmount: parseFloat(requestedAmount),
+          requestedAmount: parseCurrency(requestedAmount),
           approvedAmount: selectedAmount,
           installments: installments,
           interestRate: 5.89,
@@ -616,7 +616,7 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
           userId: profile.uid,
           type: type as 'personal' | 'vehicle',
           monthlyRevenue: parseCurrency(revenue),
-          requestedAmount: parseFloat(requestedAmount),
+          requestedAmount: parseCurrency(requestedAmount),
           approvedAmount: selectedAmount,
           installments: installments,
           interestRate: 5.89,
@@ -1169,9 +1169,17 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
                       <div className="relative">
                         <span className="absolute left-5 top-1/2 -translate-y-1/2 font-bold text-zinc-400">R$</span>
                         <input 
-                          type="number" 
+                          type="text" 
+                          inputMode="numeric"
                           value={requestedAmount}
-                          onChange={e => setRequestedAmount(e.target.value)}
+                          onChange={e => {
+                            const val = e.target.value.replace(/\D/g, '');
+                            const formatted = (Number(val) / 100).toLocaleString('pt-BR', {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2
+                            });
+                            setRequestedAmount(formatted);
+                          }}
                           placeholder="0,00"
                           className="w-full bg-zinc-50 border-none rounded-2xl py-4 pl-12 pr-5 text-lg font-bold focus:ring-2 focus:ring-[#008542] outline-none"
                         />
