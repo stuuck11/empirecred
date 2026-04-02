@@ -11,6 +11,8 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
   const [activeTab, setActiveTab] = useState<'dashboard' | 'config' | 'users' | 'proposals' | 'verifications' | 'revenue' | 'documents'>('dashboard');
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [now, setNow] = useState(new Date());
+  const [showCleanupConfirm, setShowCleanupConfirm] = useState(false);
+  const [isCleaning, setIsCleaning] = useState(false);
   
   // Dashboard States
   type TimeRange = 'today' | 'yesterday' | 'before_yesterday' | '7d' | 'all';
@@ -321,7 +323,47 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
         console.error("Error deleting old proposal:", error);
       }
     });
+
+    // Auto-delete pending proposals older than 2 days
+    const twoDays = 2 * 24 * 60 * 60 * 1000;
+    const pendingOldProposals = proposals.filter(p => {
+      if (p.status !== 'pending') return false;
+      const createdAt = new Date(p.createdAt).getTime();
+      return (nowTime - createdAt) > twoDays;
+    });
+
+    pendingOldProposals.forEach(async (p) => {
+      try {
+        await deleteDoc(doc(db, 'proposals', p.id!));
+      } catch (error) {
+        console.error("Error deleting old pending proposal:", error);
+      }
+    });
   }, [proposals, config.autoReleaseTime, now]);
+
+  const handleManualCleanup = async () => {
+    setIsCleaning(true);
+    const nowTime = new Date().getTime();
+    const twoDays = 2 * 24 * 60 * 60 * 1000;
+    
+    const pendingOldProposals = proposals.filter(p => {
+      if (p.status !== 'pending') return false;
+      const createdAt = new Date(p.createdAt).getTime();
+      return (nowTime - createdAt) > twoDays;
+    });
+
+    for (const p of pendingOldProposals) {
+      try {
+        await deleteDoc(doc(db, 'proposals', p.id!));
+      } catch (error) {
+        console.error("Error deleting old pending proposal:", error);
+      }
+    }
+    
+    setIsCleaning(false);
+    setShowCleanupConfirm(false);
+    alert(`${pendingOldProposals.length} propostas pendentes antigas foram removidas.`);
+  };
 
   const formatTimeLeft = (timestamp: string, analysisTime: number, override?: number) => {
     const finalTime = override || analysisTime;
@@ -478,7 +520,7 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
       <aside className="w-full md:w-64 bg-white border-r border-zinc-200 p-6 space-y-8">
         <div className="space-y-1">
           <h1 className="text-xl font-bold">EmpireCred Admin</h1>
-          <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">v1.7.0</p>
+          <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">v1.7.1</p>
         </div>
         <nav className="space-y-2">
           <TabButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<TrendingUp size={18}/>} label="Dashboard" />
@@ -787,6 +829,15 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
                   placeholder="Ex: 5511999999999"
                   className="w-full bg-zinc-50 border-none rounded-xl py-3 px-4 text-xs outline-none"
                 />
+              </div>
+              <div className="pt-4">
+                <button 
+                  onClick={() => setShowCleanupConfirm(true)}
+                  className="w-full bg-red-50 text-red-600 py-3 rounded-xl text-xs font-bold hover:bg-red-100 transition-colors flex items-center justify-center space-x-2"
+                >
+                  <Trash2 size={16} />
+                  <span>Limpar Propostas Pendentes (+2 dias)</span>
+                </button>
               </div>
             </section>
 
@@ -1273,6 +1324,41 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
                 </button>
                 <button 
                   onClick={() => setConfirmDelete(null)}
+                  className="w-full bg-zinc-100 text-zinc-600 py-4 rounded-2xl font-bold text-sm hover:bg-zinc-200 transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {showCleanupConfirm && (
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="bg-white w-full max-w-sm rounded-[32px] p-8 shadow-2xl space-y-6"
+            >
+              <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto text-red-500">
+                <Trash2 size={32} />
+              </div>
+              <div className="text-center space-y-2">
+                <h3 className="text-xl font-bold">Limpar Propostas</h3>
+                <p className="text-sm text-zinc-500">
+                  Deseja remover todas as propostas pendentes criadas há mais de 2 dias? Esta ação é irreversível.
+                </p>
+              </div>
+              <div className="flex flex-col space-y-3">
+                <button 
+                  onClick={handleManualCleanup}
+                  disabled={isCleaning}
+                  className="w-full bg-red-500 text-white py-4 rounded-2xl font-bold text-sm hover:bg-red-600 transition-colors disabled:opacity-50"
+                >
+                  {isCleaning ? 'Limpando...' : 'Sim, Limpar Agora'}
+                </button>
+                <button 
+                  onClick={() => setShowCleanupConfirm(false)}
                   className="w-full bg-zinc-100 text-zinc-600 py-4 rounded-2xl font-bold text-sm hover:bg-zinc-200 transition-colors"
                 >
                   Cancelar
