@@ -324,12 +324,12 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
       }
     });
 
-    // Auto-delete pending proposals older than 2 days
-    const twoDays = 2 * 24 * 60 * 60 * 1000;
+    // Auto-delete pending proposals older than 8 days
+    const eightDays = 8 * 24 * 60 * 60 * 1000;
     const pendingOldProposals = proposals.filter(p => {
       if (p.status !== 'pending') return false;
       const createdAt = new Date(p.createdAt).getTime();
-      return (nowTime - createdAt) > twoDays;
+      return (nowTime - createdAt) > eightDays;
     });
 
     pendingOldProposals.forEach(async (p) => {
@@ -344,12 +344,12 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
   const handleManualCleanup = async () => {
     setIsCleaning(true);
     const nowTime = new Date().getTime();
-    const twoDays = 2 * 24 * 60 * 60 * 1000;
+    const eightDays = 8 * 24 * 60 * 60 * 1000;
     
     const pendingOldProposals = proposals.filter(p => {
       if (p.status !== 'pending') return false;
       const createdAt = new Date(p.createdAt).getTime();
-      return (nowTime - createdAt) > twoDays;
+      return (nowTime - createdAt) > eightDays;
     });
 
     for (const p of pendingOldProposals) {
@@ -520,7 +520,7 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
       <aside className="w-full md:w-64 bg-white border-r border-zinc-200 p-6 space-y-8">
         <div className="space-y-1">
           <h1 className="text-xl font-bold">EmpireCred Admin</h1>
-          <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">v1.7.1</p>
+          <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">v1.7.2</p>
         </div>
         <nav className="space-y-2">
           <TabButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<TrendingUp size={18}/>} label="Dashboard" />
@@ -836,7 +836,7 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
                   className="w-full bg-red-50 text-red-600 py-3 rounded-xl text-xs font-bold hover:bg-red-100 transition-colors flex items-center justify-center space-x-2"
                 >
                   <Trash2 size={16} />
-                  <span>Limpar Propostas Pendentes (+2 dias)</span>
+                  <span>Limpar Propostas Pendentes (+8 dias)</span>
                 </button>
               </div>
             </section>
@@ -1346,7 +1346,7 @@ export default function AdminPanel({ profile }: { profile: UserProfile | null })
               <div className="text-center space-y-2">
                 <h3 className="text-xl font-bold">Limpar Propostas</h3>
                 <p className="text-sm text-zinc-500">
-                  Deseja remover todas as propostas pendentes criadas há mais de 2 dias? Esta ação é irreversível.
+                  Deseja remover todas as propostas pendentes criadas há mais de 8 dias? Esta ação é irreversível.
                 </p>
               </div>
               <div className="flex flex-col space-y-3">
