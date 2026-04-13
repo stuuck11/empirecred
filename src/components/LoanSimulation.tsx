@@ -1425,7 +1425,7 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
                           handleGeneratePayment(calculateTaxes(selectedAmount), "Taxa de Antecipação de Empréstimo", 'pix');
                         }}
                         disabled={!termsAccepted}
-                        className="text-xs font-bold text-[#008542] hover:underline disabled:opacity-50"
+                        className="w-full bg-emerald-50 text-xs font-bold text-[#008542] py-3 rounded-xl border border-emerald-100 hover:bg-emerald-100 transition-colors disabled:opacity-50"
                       >
                         Ou pagar via Pix para liberação imediata
                       </button>
@@ -1433,7 +1433,7 @@ function LoanSimulation({ profile, setProfile }: { profile: UserProfile | null, 
 
                     <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
                       <p className="text-[10px] text-[#008542] leading-relaxed text-center flex flex-wrap items-center justify-center gap-1">
-                        <strong>Aviso:</strong> Após pagar a taxa da plataforma (boleto de antecipação ou via PIX), o valor do empréstimo aprovado é depositado em até 10 minutos pela instituição parceira direto na sua conta empire. 
+                        <strong>Aviso:</strong> Após pagar a taxa da plataforma (boleto de antecipação ou via PIX), o valor do empréstimo aprovado é depositado normalmente em até 10 minutos pela instituição parceira direto na sua conta EmpireCred. 
                         <img src="https://imgur.com/tOniE14.png" alt="Empire" className="h-[20px] w-auto inline-block align-middle" referrerPolicy="no-referrer" />
                       </p>
                     </div>
